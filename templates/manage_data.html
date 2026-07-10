@@ -87,17 +87,16 @@
             <td>{{ ev.event_date }}</td>
             <td>{{ ev.created_by }}</td>
             <td>
-              {% if ev.status == 'Approved' %}
+              {% if ev.status == '✅' %}
               <span class="badge bg-success">Approved</span>
-              {% elif ev.status == 'Pending Deletion' %}
+              {% elif ev.status == '❗' %}
               <span class="badge bg-danger">Pending Deletion</span>
               {% else %}
               <span class="badge bg-warning text-dark">{{ ev.status }}</span>
               {% endif %}
             </td>
             <td>
-              {% if role == 'superadmin' %} {% if ev.status == 'Pending
-              Approval' %}
+              {% if role == 'superadmin' %} {% if ev.status == '❓' %}
               <button
                 class="btn btn-sm btn-success py-0 btn-confirm"
                 data-url="{{ url_for('approve_event', id=ev._id) }}"
@@ -108,7 +107,18 @@
               >
                 Approve
               </button>
-              {% elif ev.status == 'Pending Deletion' %}
+              <button
+                class="btn btn-sm btn-danger py-0 btn-confirm"
+                data-url="{{ url_for('delete_event', id=ev._id) }}"
+                data-title="Tolak Proposal?"
+                data-msg="Apakah Anda yakin ingin menolak dan menghapus proposal acara baru ini?"
+                data-icon="warning"
+                data-color="#dc3545"
+              >
+                Reject
+              </button>
+
+              {% elif ev.status == '❗' %}
               <button
                 class="btn btn-sm btn-danger py-0 btn-confirm"
                 data-url="{{ url_for('approve_delete_event', id=ev._id) }}"
@@ -123,37 +133,38 @@
                 class="btn btn-sm btn-secondary py-0 text-white btn-confirm"
                 data-url="{{ url_for('reject_delete_event', id=ev._id) }}"
                 data-title="Tolak Hapus Acara?"
-                data-msg="Menolak permohonan hapus dan mengembalikan status acara menjadi Aktif?"
+                data-msg="Menolak permohonan hapus dan mengembalikan status acara menjadi Approved?"
                 data-icon="info"
                 data-color="#6c757d"
               >
                 Reject Delete
               </button>
-              {% endif %}
+
+              {% elif ev.status == '✅' %}
               <button
-                class="btn btn-sm btn-danger py-0 btn-confirm"
+                class="btn btn-sm btn-outline-dark py-0 btn-confirm"
                 data-url="{{ url_for('delete_event', id=ev._id) }}"
                 data-title="Hapus Permanen?"
-                data-msg="Tindakan ini akan menghapus data acara secara langsung tanpa persetujuan kembali!"
+                data-msg="Tindakan ini akan menghapus data acara secara langsung!"
                 data-icon="warning"
-                data-color="#dc3545"
+                data-color="#343a40"
               >
                 Direct Delete
               </button>
-
-              {% elif role == 'admin' %} {% if ev.status == 'Pending Approval'
-              %}
+              {% endif %} {% elif role == 'admin' %} {# Cek apakah acara ini
+              dibuat oleh admin yang sedang login #} {% if ev.created_by ==
+              session['user']['username'] %} {% if ev.status == '❓' %}
               <button
-                class="btn btn-sm btn-outline-danger py-0 btn-confirm"
+                class="btn btn-sm btn-danger py-0 btn-confirm"
                 data-url="{{ url_for('cancel_event_proposal', id=ev._id) }}"
                 data-title="Batalkan Proposal?"
-                data-msg="Membatalkan proposal acara yang Anda ajukan?"
+                data-msg="Apakah Anda yakin ingin membatalkan proposal acara yang Anda ajukan?"
                 data-icon="warning"
                 data-color="#dc3545"
               >
-                Batal Propose
+                Batal
               </button>
-              {% elif ev.status == 'Approved' %}
+              {% elif ev.status == '✅' %}
               <button
                 class="btn btn-sm btn-danger py-0 btn-confirm"
                 data-url="{{ url_for('request_delete_event', id=ev._id) }}"
@@ -164,7 +175,7 @@
               >
                 Minta Hapus
               </button>
-              {% elif ev.status == 'Pending Deletion' %}
+              {% elif ev.status == '❗' %}
               <button
                 class="btn btn-sm btn-outline-danger py-0 btn-confirm"
                 data-url="{{ url_for('cancel_delete_event_request', id=ev._id) }}"
@@ -177,9 +188,24 @@
               </button>
               {% else %}
               <span class="text-muted">-</span>
-              {% endif %} {% else %}
+              {% endif %} {% else %} {# JIKA ACARA DIBUAT OLEH ADMIN LAIN #} {%
+              if ev.status == '✅' %}
+              <button
+                class="btn btn-sm btn-danger py-0 btn-confirm"
+                data-url="{{ url_for('request_delete_event', id=ev._id) }}"
+                data-title="Minta Hapus Acara?"
+                data-msg="Mengajukan permohonan penghapusan acara milik admin lain ke Superadmin?"
+                data-icon="warning"
+                data-color="#dc3545"
+              >
+                Minta Hapus
+              </button>
+              {% elif ev.status == '❗' %}
+              <span class="badge bg-danger">Pending Deletion</span>
+              {% else %} {# Jika statusnya masih proposal (❓) milik admin lain,
+              tombol disembunyikan #}
               <span class="text-muted">-</span>
-              {% endif %}
+              {% endif %} {% endif %} {% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -205,7 +231,7 @@
             <td>{{ invite.title }}</td>
             <td><strong>{{ invite.guest_name }}</strong></td>
             <td>
-              {% if invite.status == 'Pending Deletion' %}
+              {% if invite.status == '❗' %}
               <span class="badge bg-danger">Pending Deletion</span>
               {% else %}
               <span class="badge bg-success">Active</span>
@@ -220,22 +246,23 @@
               >
             </td>
             <td>
-              {% if role == 'superadmin' %} {% if invite.status == 'Pending
-              Deletion' %}
+              {% if role == 'superadmin' %} {% if invite.status == '❗' %}
+              <!-- Approve Delete untuk Undangan -->
               <button
                 class="btn btn-sm btn-danger py-0 btn-confirm"
                 data-url="{{ url_for('delete_data', id=invite._id) }}"
-                data-title="Setujui Hapus Undangan?"
+                data-title="Approve Delete Undangan?"
                 data-msg="Menyetujui permohonan dan menghapus undangan ini secara permanen?"
                 data-icon="warning"
                 data-color="#dc3545"
               >
                 Approve Delete
               </button>
+              <!-- Reject Delete untuk Undangan -->
               <button
                 class="btn btn-sm btn-outline-secondary py-0 btn-confirm"
                 data-url="{{ url_for('reject_delete', id=invite._id) }}"
-                data-title="Tolak Hapus Undangan?"
+                data-title="Reject Delete Undangan?"
                 data-msg="Menolak permohonan hapus dan mengaktifkan kembali undangan ini?"
                 data-icon="info"
                 data-color="#6c757d"
@@ -253,8 +280,8 @@
               >
                 Direct Delete
               </button>
-              {% endif %} {% elif role == 'admin' %} {% if invite.status ==
-              'Pending Deletion' %}
+              {% endif %} {% elif role == 'admin' %} {% if invite.status == '❗'
+              %}
               <button
                 class="btn btn-sm btn-outline-warning py-0 btn-confirm"
                 data-url="{{ url_for('cancel_delete_request', id=invite._id) }}"
