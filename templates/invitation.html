@@ -3,7 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Wedding / Event Invitation</title>
+    <title>{{ invite.title }} - Invitation</title>
+    {% if event and event.event_logo and event.event_logo.startswith('/static') %}
+      <link rel="icon" href="{{ event.event_logo }}">
+    {% else %}
+      <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>{{ event.event_logo if (event and event.event_logo) else '🎉' }}</text></svg>">
+    {% endif %}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -197,7 +202,7 @@
     <div id="envelopeCover" class="envelope-cover">
       <div class="brand-title">Digital Invitation</div>
 
-      <div class="envelope-wrapper" onclick="openInvitation()">
+      <div class="envelope-wrapper" onclick="handleManualOpen()">
         <div class="letter-card">
           <p
             class="text-muted text-uppercase tracking-wider small mb-2"
@@ -215,7 +220,7 @@
             </p>
             <h4 class="fw-bold text-dark">{{ invite.guest_name }}</h4>
           </div>
-          <span class="btn action-seal">Buka Surat</span>
+          <span class="btn action-seal" onclick="handleManualOpen()">Buka Surat</span>
         </div>
       </div>
     </div>
@@ -365,130 +370,87 @@
           </div>
         </div>
 
-        <div class="my-5 p-4 rounded-3 border bg-light text-start">
-          <h5 style="color: #8a7b6e" class="text-center mb-3">
-            RSVP Attendance
-          </h5>
-          <form method="POST" action="">
-            <input type="hidden" name="form_type" value="rsvp" />
-            <div class="mb-3">
-              <label class="form-label fw-bold text-secondary">Nama Tamu</label>
-              <input
-                type="text"
-                name="guest_name"
-                class="form-control"
-                value="{{ invite.guest_name }}"
-                readonly
-              />
-            </div>
-            <div class="mb-3">
-              <label class="form-label fw-bold text-secondary"
-                >Jumlah Kehadiran (Total Guest)</label
-              >
-              <input
-                type="number"
-                name="total_guest"
-                class="form-control"
-                placeholder="Contoh: 2"
-                min="1"
-                required
-              />
-            </div>
-            <div class="mb-3">
-              <label class="form-label fw-bold text-secondary"
-                >Konfirmasi Kehadiran</label
-              >
-              <div class="d-flex gap-3">
-                <div class="form-check">
-                  <input
-                    class="form-check-input"
-                    type="radio"
-                    name="attendance"
-                    id="attend"
-                    value="Attend"
-                    checked
-                  />
-                  <label class="form-check-label" href="#attend"
-                    >Attend (Hadir)</label
-                  >
-                </div>
-                <div class="form-check">
-                  <input
-                    class="form-check-input"
-                    type="radio"
-                    name="attendance"
-                    id="not_attend"
-                    value="Not Attend"
-                  />
-                  <label class="form-check-label" href="#not_attend"
-                    >Not Attend (Tidak Hadir)</label
-                  >
-                </div>
+        <!-- ================= FORM 1: KONFIRMASI KEHADIRAN (RSVP) ================= -->
+        <div class="container my-5 text-center" id="rsvp-section">
+          <div class="card shadow-sm border-0 p-4 bg-white mx-auto" style="max-width: 600px; border-radius: 15px;">
+            <h3 class="fw-bold mb-3" style="font-family: 'Playfair Display', serif;">Konfirmasi Kehadiran (RSVP)</h3>
+            <p class="text-muted small mb-4">Mohon isi kehadiran Anda dan jumlah pax yang akan dibawa.</p>
+
+            <form id="rsvpForm" action="/invitation/{{ invite._id }}/rsvp" method="POST">
+              <div class="mb-3 text-start">
+                <label class="form-label small fw-bold">Nama Tamu</label>
+                <input type="text" name="guest_name" class="form-control" value="{{ invite.guest_name }}" readonly required>
               </div>
-            </div>
-            <button
-              type="submit"
-              class="btn w-100 text-white rounded-pill"
-              style="background-color: #8a7b6e"
-            >
-              Kirim Konfirmasi
-            </button>
-          </form>
+
+              <div class="mb-3 text-start">
+                <label class="form-label small fw-bold">Konfirmasi</label>
+                <select name="attendance" class="form-select" required>
+                  <option value="" disabled {% if not current_rsvp %}selected{% endif %}>Apakah Anda akan hadir?</option>
+                  <option value="Hadir" {% if current_rsvp and current_rsvp.attendance == 'Hadir' %}selected{% endif %}>✅ Ya, Saya Akan Hadir</option>
+                  <option value="Tidak Hadir" {% if current_rsvp and current_rsvp.attendance == 'Tidak Hadir' %}selected{% endif %}>❌ Maaf, Saya Berhalangan Hadir</option>
+                </select>
+              </div>
+
+              <div class="mb-4 text-start">
+                <label class="form-label small fw-bold">Jumlah Orang</label>
+                <input type="number" name="total_guests" class="form-control" min="1" value="{{ current_rsvp.total_guests if (current_rsvp and current_rsvp.total_guests) else 1 }}" required>
+              </div>
+
+              <button type="submit" class="btn btn-dark w-100 py-2 fw-bold" style="border-radius: 8px;">Kirim Konfirmasi Kehadiran</button>
+            </form>
+          </div>
         </div>
 
-        <div class="my-5 text-start">
-          <h5 style="color: #8a7b6e" class="text-center mb-3">
-            Wedding Wishes
-          </h5>
-          <form method="POST" action="" class="mb-4">
-            <input type="hidden" name="form_type" value="wishes" />
-            <div class="mb-3">
-              <label class="form-label fw-bold text-secondary">Nama</label>
-              <input
-                type="text"
-                name="wishes_name"
-                class="form-control"
-                value="{{ invite.guest_name }}"
-                readonly
-              />
-            </div>
-            <div class="mb-3">
-              <label class="form-label fw-bold text-secondary"
-                >Ucapan & Doa (Wishes)</label
-              >
-              <textarea
-                name="wishes_text"
-                class="form-control"
-                rows="3"
-                placeholder="Tulis ucapan selamat Anda di sini..."
-                required
-              ></textarea>
-            </div>
-            <button
-              type="submit"
-              class="btn w-100 text-white rounded-pill"
-              style="background-color: #d63384; border: none"
-            >
-              Kirim Ucapan
-            </button>
-          </form>
+        <!-- ================= FORM 2: BERIKAN UCAPAN & DOA RESTU ================= -->
+        <div class="container my-5 text-center" id="wishes-section">
+          <div class="card shadow-sm border-0 p-4 bg-white mx-auto" style="max-width: 600px; border-radius: 15px;">
+            <h3 class="fw-bold mb-3" style="font-family: 'Playfair Display', serif;">Kirim Doa Restu & Ucapan</h3>
+            <p class="text-muted small mb-4">Berikan ucapan selamat manis Anda untuk kedua mempelai.</p>
 
-          <h6 class="fw-bold mb-2 text-secondary">
-            Ucapan dari Para Tamu ({{ wishes|length if wishes else 0 }}):
-          </h6>
-          <div class="wishes-list">
-            {% if wishes %} {% for w in wishes %}
-            <div class="border-bottom pb-2 mb-2">
-              <strong class="text-dark">{{ w.name }}</strong>
-              <p class="mb-0 text-muted small" style="font-style: italic">
-                "{{ w.text }}"
-              </p>
+            <form id="wishesForm" action="/invitation/{{ invite._id }}/wishes" method="POST"> 
+              <div class="mb-3 text-start">
+                <label class="form-label small fw-bold">Nama Pengirim</label>
+                <input type="text" name="guest_name" class="form-control" value="{{ invite.guest_name }}" readonly required>
+              </div>
+
+              <div class="mb-4 text-start">
+                <label class="form-label small fw-bold">Berikan Ucapan & Doa Restu</label>
+                <!-- Mengisi value lama jika tamu sudah pernah mengisi wishes -->
+                <textarea name="wishes" class="form-control" rows="4" placeholder="Tulis ucapan selamat Anda di sini..." required>{{ current_rsvp.wishes if current_rsvp else '' }}</textarea>
+              </div>
+
+              <button type="submit" class="btn btn-secondary w-100 py-2 fw-bold" style="border-radius: 8px; background-color: #8a7b6e; border: none;">Kirim Ucapan</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- ================= PLAY LIST UCAPAN DARI TAMU LAIN ================= -->
+        <div class="container my-5 text-center">
+          <h4 class="fw-bold mb-4" style="font-family: 'Playfair Display', serif;">Ucapan & Doa Tamu Undangan</h4>
+          <div id="wishesContainer" class="mx-auto" style="max-width: 600px; max-height: 400px; overflow-y: auto; text-align: left;">
+            {% for wish in all_wishes %}
+              <div class="p-3 bg-white border rounded mb-2 shadow-sm">
+                <strong class="text-dark d-block mb-1">{{ wish.guest_name }}</strong>
+                <p class="mb-0 text-secondary italic small" style="font-style: italic;">"{{ wish.wishes }}"</p>
+              </div>
+            {% else %}
+              <p id="emptyWishes" class="text-muted text-center small">Belum ada ucapan dari tamu undangan lain.</p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="container my-5 text-center">
+          <div class="p-4 mx-auto border bg-white shadow-sm d-inline-block" style="border-radius: 20px; max-width: 320px;">
+            <h5 class="fw-bold mb-2" style="font-family: 'Playfair Display', serif;">Digital Guest Book QR Code</h5>
+            <p class="text-muted text-center" style="font-size: 0.8rem; line-height: 1.3;">Tunjukkan QR Code ini kepada petugas <strong>Usher</strong> di meja penerima tamu untuk melakukan registrasi kehadiran masuk.</p>
+            
+            <div class="bg-light p-3 my-3 d-inline-block rounded border">
+              <img src="{{ qr_code_url }}" alt="QR Code Tamu" class="img-fluid" style="width: 200px; height: 200px;">
             </div>
-            {% endfor %} {% else %}
-            <p class="text-muted text-center small my-3">
-              Belum ada ucapan. Jadilah yang pertama memberikan doa!
-            </p>
-            {% endif %}
+            
+            <div class="badge bg-dark text-uppercase px-3 py-2" style="font-size: 0.85rem; letter-spacing: 1px;">
+              {{ invite.guest_name }}
+            </div>
           </div>
         </div>
 
@@ -513,10 +475,13 @@
       </div>
     </div>
 
+    <!-- SweetAlert2 Library -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <script>
       const targetDateStr = "{{ invite.date }}";
 
-      function openInvitation() {
+      function handleManualOpen() {
         document.getElementById("envelopeCover").classList.add("envelope-open");
         document.getElementById("mainContent").classList.add("show");
         setTimeout(function () {
@@ -527,11 +492,92 @@
         initCalendarLink();
       }
 
+      document.addEventListener("DOMContentLoaded", function() {
+        // Inisialisasi SweetAlert Toast
+        const Toast = Swal.mixin({
+          toast: true,
+          position: 'top',
+          showConfirmButton: false,
+          timer: 5000,
+          timerProgressBar: true,
+          didOpen: (toast) => {
+            toast.addEventListener('mouseenter', Swal.stopTimer)
+            toast.addEventListener('mouseleave', Swal.resumeTimer)
+          }
+        });
+
+        // 1. AJAX FORM RSVP
+        const rsvpForm = document.getElementById('rsvpForm');
+        if (rsvpForm) {
+          rsvpForm.addEventListener('submit', function(e) {
+            e.preventDefault(); 
+            const formData = new FormData(this);
+
+            fetch(this.action, {
+              method: 'POST',
+              body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+              if (data.status === 'success') {
+                Toast.fire({ icon: 'success', title: data.message });
+              } else {
+                Toast.fire({ icon: 'error', title: data.message });
+              }
+            })
+            .catch(() => {
+              Toast.fire({ icon: 'error', title: 'Gagal memproses koneksi RSVP.' });
+            });
+          });
+        }
+
+        // AJAX FORM WISHES
+        const wishesForm = document.getElementById('wishesForm');
+        if (wishesForm) {
+          wishesForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+
+            fetch(this.action, {
+              method: 'POST',
+              body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+              if (data.status === 'success') {
+                Toast.fire({ icon: 'success', title: data.message });
+                
+                const container = document.getElementById('wishesContainer');
+                if (container && data.wishes_list) {
+                  container.innerHTML = ''; // Kosongkan kontainer lama terlebih dahulu
+                  
+                  // Render ulang seluruh daftar ucapan yang dikirimkan oleh server
+                  data.wishes_list.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'p-3 bg-white border rounded mb-2 shadow-sm';
+                    div.innerHTML = `
+                      <strong class="text-dark d-block mb-1">${item.guest_name}</strong>
+                      <p class="mb-0 text-secondary small" style="font-style: italic;">"${item.wishes}"</p>
+                    `;
+                    container.appendChild(div);
+                  });
+                }
+              } else {
+                Toast.fire({ icon: 'error', title: data.message });
+              }
+            })
+            .catch(() => {
+              Toast.fire({ icon: 'error', title: 'Gagal memperbarui ucapan.' });
+            });
+          });
+        }
+      });
+
       // LOGIK COUNTDOWN TIMER
       function initCountdown() {
         let targetDate = new Date(targetDateStr).getTime();
         if (isNaN(targetDate)) {
-          targetDate = new Date().getTime() + 7 * 24 * 60 * 60 * 1000; // Default simulasi H+7 jika parsing error
+          targetDate = new Date().getTime() + 7 * 24 * 60 * 60 * 1000;
         }
 
         const timerInterval = setInterval(function () {
@@ -546,22 +592,14 @@
           }
 
           const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-          const hours = Math.floor(
-            (distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
-          );
-          const minutes = Math.floor(
-            (distance % (1000 * 60 * 60)) / (1000 * 60),
-          );
+          const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
           const seconds = Math.floor((distance % (1000 * 60)) / 1000);
 
-          document.getElementById("days").innerText =
-            days < 10 ? "0" + days : days;
-          document.getElementById("hours").innerText =
-            hours < 10 ? "0" + hours : hours;
-          document.getElementById("minutes").innerText =
-            minutes < 10 ? "0" + minutes : minutes;
-          document.getElementById("seconds").innerText =
-            seconds < 10 ? "0" + seconds : seconds;
+          document.getElementById("days").innerText = days < 10 ? "0" + days : days;
+          document.getElementById("hours").innerText = hours < 10 ? "0" + hours : hours;
+          document.getElementById("minutes").innerText = minutes < 10 ? "0" + minutes : minutes;
+          document.getElementById("seconds").innerText = seconds < 10 ? "0" + seconds : seconds;
         }, 1000);
       }
 
@@ -576,19 +614,12 @@
         const day = String(baseDate.getDate()).padStart(2, "0");
 
         const dateParam = `${year}${month}${day}T090000/${year}${month}${day}T130000`;
-        const details = encodeURIComponent(
-          "Undangan digital formal untuk menghadiri acara: " +
-            "{{ invite.title }}",
-        );
-        const location = encodeURIComponent(
-          "Gedung Pertemuan Utama, Jl. Anggrek No.123",
-        );
+        const details = encodeURIComponent("Undangan digital formal untuk menghadiri acara: {{ invite.title }}");
+        const location = encodeURIComponent("Gedung Pertemuan Utama, Jl. Anggrek No.123");
 
         const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dateParam}&details=${details}&location=${location}&sf=true&output=xml`;
 
-        document
-          .getElementById("btnCalendar")
-          .setAttribute("href", googleCalendarUrl);
+        document.getElementById("btnCalendar").setAttribute("href", googleCalendarUrl);
       }
     </script>
   </body>
