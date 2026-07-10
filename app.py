@@ -127,7 +127,7 @@ def manage_data():
     if request.method == 'POST':
         form_type = request.form.get('form_type')
         
-        # CREATE EVENT
+        # A. FITUR CREATE EVENT (Admin & Superadmin)
         if form_type == 'create_event':
             if current_role not in ['superadmin', 'admin']:
                 flash("Unauthorized.", "danger")
@@ -148,7 +148,7 @@ def manage_data():
             flash(msg, "success" if status == "Approved" else "warning")
             return redirect(url_for('manage_data'))
             
-        # CREATE INVITATION
+        # B. FITUR CREATE INVITATION (Admin & Superadmin)
         elif form_type == 'create_invitation':
             if current_role not in ['superadmin', 'admin']:
                 flash("Unauthorized.", "danger")
@@ -156,8 +156,8 @@ def manage_data():
                 
             event_id = request.form.get('event_id')
             guest_name = request.form.get('guest_name')
-            selected_event = events_collection.find_one({"_id": ObjectId(event_id)})
             
+            selected_event = events_collection.find_one({"_id": ObjectId(event_id)})
             if selected_event:
                 invitations_collection.insert_one({
                     "event_id": ObjectId(event_id),
@@ -169,15 +169,25 @@ def manage_data():
                 flash("Invitation generated successfully!", "success")
             return redirect(url_for('manage_data'))
 
-    # READ DATA
+    # READ DATA UNTUK DITAMPILKAN DI HALAMAN
     all_events = list(events_collection.find())
-    approved_events = list(events_collection.find({"status": "Approved"}))
+    
+    # --- MODIFIKASI TERBARU ---
+    # Jika role adalah admin, tampilkan acara 'Approved', 'Pending Approval', dan 'Pending Deletion' di dropdown
+    if current_role == 'admin':
+        dropdown_events = list(events_collection.find({
+            "status": {"$in": ["Approved", "Pending Approval", "Pending Deletion"]}
+        }))
+    else:
+        # Untuk superadmin/usher tetap hanya menampilkan yang sudah Approved jika diperlukan
+        dropdown_events = list(events_collection.find({"status": "Approved"}))
+    
     invitations = list(invitations_collection.find())
     
     return render_template(
         'manage_data.html', 
         events=all_events, 
-        approved_events=approved_events, 
+        approved_events=dropdown_events, # Variable ini dipakai di template untuk looping dropdown
         invitations=invitations, 
         role=current_role
     )
@@ -218,6 +228,17 @@ def approve_delete_event(id):
     flash("Permintaan hapus disetujui, acara dihapus permanen.", "success")
     return redirect(url_for('manage_data'))
 
+@app.route('/approve-event/<id>')
+@login_required
+@roles_required('superadmin')
+def approve_event(id):
+    """Superadmin menyetujui proposal acara baru dari Admin"""
+    events_collection.update_one(
+        {"_id": ObjectId(id)},
+        {"$set": {"status": "Approved"}}
+    )
+    flash("Proposal acara berhasil disetujui!", "success")
+    return redirect(url_for('manage_data'))
 
 @app.route('/reject-delete-event/<id>')
 @login_required
@@ -231,6 +252,17 @@ def reject_delete_event(id):
     flash("Permintaan hapus acara ditolak. Acara tetap aktif.", "info")
     return redirect(url_for('manage_data'))
 
+@app.route('/request-delete/<id>')
+@login_required
+@roles_required('admin')
+def request_delete(id):
+    """Admin mengajukan permohonan hapus undangan yang aktif"""
+    invitations_collection.update_one(
+        {"_id": ObjectId(id)},
+        {"$set": {"status": "Pending Deletion", "requested_by": session['user']['username']}}
+    )
+    flash("Permintaan hapus undangan telah dikirim ke Superadmin.", "warning")
+    return redirect(url_for('manage_data'))
 
 @app.route('/delete-event/<id>')
 @login_required
@@ -256,6 +288,18 @@ def cancel_delete_request(id):
         {"$set": {"status": "Active"}, "$unset": {"requested_by": ""}}
     )
     flash("Permintaan hapus undangan berhasil dibatalkan.", "info")
+    return redirect(url_for('manage_data'))
+
+@app.route('/cancel-delete-event-request/<id>')
+@login_required
+@roles_required('admin')
+def cancel_delete_event_request(id):
+    """Admin membatalkan permintaan hapus acara (mengembalikan status menjadi Approved)"""
+    events_collection.update_one(
+        {"_id": ObjectId(id), "status": "Pending Deletion"},
+        {"$set": {"status": "Approved"}, "$unset": {"requested_by": ""}}
+    )
+    flash("Permintaan hapus acara berhasil dibatalkan. Acara kembali aktif.", "info")
     return redirect(url_for('manage_data'))
 
 @app.route('/delete/<id>')
