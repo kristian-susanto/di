@@ -12,22 +12,15 @@
       <form method="POST">
         <input type="hidden" name="form_type" value="create_event" />
         <div class="mb-3">
-          <label class="form-label">Event Name</label>
-          <input
-            type="text"
-            name="event_name"
-            class="form-control"
-            placeholder="Wedding of Alex & Bella"
-            required
-          />
+          <label class="form-label small fw-bold">Event Name</label>
+          <input type="text" name="event_name" class="form-control" placeholder="Wedding of Alex & Bella" required />
         </div>
         <div class="mb-3">
-          <label class="form-label">Event Date</label>
+          <label class="form-label small fw-bold">Event Date</label>
           <input type="date" name="event_date" class="form-control" required />
         </div>
         <button type="submit" class="btn btn-primary w-100">
-          {% if role == 'admin' %}Submit Proposal{% else %}Create Event Now{%
-          endif %}
+          {% if role == 'admin' %}Submit Proposal{% else %}Create Event Now{% endif %}
         </button>
       </form>
     </div>
@@ -49,13 +42,7 @@
         </div>
         <div class="mb-3">
           <label class="form-label">Guest Name</label>
-          <input
-            type="text"
-            name="guest_name"
-            class="form-control"
-            placeholder="Mr. John Doe"
-            required
-          />
+          <input type="text" name="guest_name" class="form-control" placeholder="Mr. John Doe" required />
         </div>
         <button type="submit" class="btn btn-success w-100">
           Generate Link
@@ -65,16 +52,15 @@
   </div>
   {% endif %}
 
-  <div
-    class="col-md-{% if role in ['superadmin', 'admin'] %}8{% else %}12{% endif %}"
-  >
+  <div class="col-md-{% if role in ['superadmin', 'admin'] %}8{% else %}12{% endif %}">
     <div class="card p-3 shadow-sm mb-4 table-responsive">
-      <h5 class="fw-bold text-secondary">Events List</h5>
+      <h5 class="fw-bold text-secondary mb-3">Events List</h5>
       <table class="table table-bordered align-middle small">
         <thead class="table-light">
           <tr>
+            <th style="width: 60px;">Logo</th>
             <th>Event Name</th>
-            <th>Date</th>
+            <th>Date & Time</th>
             <th>Proposed By</th>
             <th>Status</th>
             <th>Action</th>
@@ -83,8 +69,18 @@
         <tbody>
           {% for ev in events %}
           <tr>
+            <td class="text-center fs-4">
+              {% if ev.event_logo and (ev.event_logo.startswith('http://') or ev.event_logo.startswith('https://') or ev.event_logo.startswith('/')) %}
+                <img src="{{ ev.event_logo }}" alt="logo" class="rounded border" style="width: 32px; height: 32px; object-fit: cover;">
+              {% else %}
+                {{ ev.event_logo if ev.event_logo else '🎉' }}
+              {% endif %}
+            </td>
             <td><strong>{{ ev.event_name }}</strong></td>
-            <td>{{ ev.event_date }}</td>
+            <td>
+              <div>{{ ev.event_date }}</div>
+              <small class="text-muted">{{ ev.event_time if ev.event_time else '10:00 - 13:00' }}</small>
+            </td>
             <td>{{ ev.created_by }}</td>
             <td>
               {% if ev.status == '✅' %}
@@ -96,116 +92,38 @@
               {% endif %}
             </td>
             <td>
-              {% if role == 'superadmin' %} {% if ev.status == '❓' %}
-              <button
-                class="btn btn-sm btn-success py-0 btn-confirm"
-                data-url="{{ url_for('approve_event', id=ev._id) }}"
-                data-title="Setujui Acara?"
-                data-msg="Apakah Anda yakin ingin menyetujui proposal acara baru ini?"
-                data-icon="question"
-                data-color="#28a745"
-              >
-                Approve
-              </button>
-              <button
-                class="btn btn-sm btn-danger py-0 btn-confirm"
-                data-url="{{ url_for('delete_event', id=ev._id) }}"
-                data-title="Tolak Proposal?"
-                data-msg="Apakah Anda yakin ingin menolak dan menghapus proposal acara baru ini?"
-                data-icon="warning"
-                data-color="#dc3545"
-              >
-                Reject
-              </button>
+              <div class="btn-group btn-group-sm" role="group">
+                {% if role in ['superadmin', 'admin'] %}
+                  <button class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#detailEventModal{{ ev._id }}">Detail</button>
+                  <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editEventModal{{ ev._id }}">Edit</button>
+                {% endif %}
 
-              {% elif ev.status == '❗' %}
-              <button
-                class="btn btn-sm btn-danger py-0 btn-confirm"
-                data-url="{{ url_for('approve_delete_event', id=ev._id) }}"
-                data-title="Setujui Hapus Acara?"
-                data-msg="Menyetujui penghapusan permanen dokumen acara ini?"
-                data-icon="warning"
-                data-color="#dc3545"
-              >
-                Approve Delete
-              </button>
-              <button
-                class="btn btn-sm btn-secondary py-0 text-white btn-confirm"
-                data-url="{{ url_for('reject_delete_event', id=ev._id) }}"
-                data-title="Tolak Hapus Acara?"
-                data-msg="Menolak permohonan hapus dan mengembalikan status acara menjadi Approved?"
-                data-icon="info"
-                data-color="#6c757d"
-              >
-                Reject Delete
-              </button>
-
-              {% elif ev.status == '✅' %}
-              <button
-                class="btn btn-sm btn-outline-dark py-0 btn-confirm"
-                data-url="{{ url_for('delete_event', id=ev._id) }}"
-                data-title="Hapus Permanen?"
-                data-msg="Tindakan ini akan menghapus data acara secara langsung!"
-                data-icon="warning"
-                data-color="#343a40"
-              >
-                Direct Delete
-              </button>
-              {% endif %} {% elif role == 'admin' %} {# Cek apakah acara ini
-              dibuat oleh admin yang sedang login #} {% if ev.created_by ==
-              session['user']['username'] %} {% if ev.status == '❓' %}
-              <button
-                class="btn btn-sm btn-danger py-0 btn-confirm"
-                data-url="{{ url_for('cancel_event_proposal', id=ev._id) }}"
-                data-title="Batalkan Proposal?"
-                data-msg="Apakah Anda yakin ingin membatalkan proposal acara yang Anda ajukan?"
-                data-icon="warning"
-                data-color="#dc3545"
-              >
-                Batal
-              </button>
-              {% elif ev.status == '✅' %}
-              <button
-                class="btn btn-sm btn-danger py-0 btn-confirm"
-                data-url="{{ url_for('request_delete_event', id=ev._id) }}"
-                data-title="Minta Hapus Acara?"
-                data-msg="Mengajukan permohonan penghapusan acara ini ke Superadmin?"
-                data-icon="warning"
-                data-color="#dc3545"
-              >
-                Minta Hapus
-              </button>
-              {% elif ev.status == '❗' %}
-              <button
-                class="btn btn-sm btn-outline-danger py-0 btn-confirm"
-                data-url="{{ url_for('cancel_delete_event_request', id=ev._id) }}"
-                data-title="Batalkan Permintaan Hapus?"
-                data-msg="Membatalkan permohonan hapus untuk acara ini?"
-                data-icon="info"
-                data-color="#6c757d"
-              >
-                Batal
-              </button>
-              {% else %}
-              <span class="text-muted">-</span>
-              {% endif %} {% else %} {# JIKA ACARA DIBUAT OLEH ADMIN LAIN #} {%
-              if ev.status == '✅' %}
-              <button
-                class="btn btn-sm btn-danger py-0 btn-confirm"
-                data-url="{{ url_for('request_delete_event', id=ev._id) }}"
-                data-title="Minta Hapus Acara?"
-                data-msg="Mengajukan permohonan penghapusan acara milik admin lain ke Superadmin?"
-                data-icon="warning"
-                data-color="#dc3545"
-              >
-                Minta Hapus
-              </button>
-              {% elif ev.status == '❗' %}
-              <span class="badge bg-danger">Pending Deletion</span>
-              {% else %} {# Jika statusnya masih proposal (❓) milik admin lain,
-              tombol disembunyikan #}
-              <span class="text-muted">-</span>
-              {% endif %} {% endif %} {% endif %}
+                {% if role == 'superadmin' %} 
+                  {% if ev.status == '❓' %}
+                  <button class="btn btn-outline-success btn-confirm" data-url="{{ url_for('approve_event', id=ev._id) }}" data-title="Setujui Acara?" data-msg="Apakah Anda yakin ingin menyetujui proposal acara baru ini?" data-icon="question" data-color="#28a745">Approve</button>
+                  <button class="btn btn-outline-danger btn-confirm" data-url="{{ url_for('delete_event', id=ev._id) }}" data-title="Tolak Proposal?" data-msg="Apakah Anda yakin ingin menolak dan menghapus proposal acara baru ini?" data-icon="warning" data-color="#dc3545">Reject</button>
+                  {% elif ev.status == '❗' %}
+                  <button class="btn btn-outline-danger btn-confirm" data-url="{{ url_for('approve_delete_event', id=ev._id) }}" data-title="Setujui Hapus Acara?" data-msg="Menyetujui penghapusan permanen dokumen acara ini?" data-icon="warning" data-color="#dc3545">Approve Delete</button>
+                  <button class="btn btn-outline-secondary text-secondary btn-confirm" data-url="{{ url_for('reject_delete_event', id=ev._id) }}" data-title="Tolak Hapus Acara?" data-msg="Menolak permohonan hapus dan mengembalikan status acara menjadi Approved?" data-icon="info" data-color="#6c757d">Reject Delete</button>
+                  {% elif ev.status == '✅' %}
+                  <button class="btn btn-outline-dark btn-confirm" data-url="{{ url_for('delete_event', id=ev._id) }}" data-title="Hapus Permanen?" data-msg="Tindakan ini akan menghapus data acara secara langsung!" data-icon="warning" data-color="#343a40">Direct Delete</button>
+                  {% endif %} 
+                {% elif role == 'admin' %} 
+                  {% if ev.created_by == session['user']['username'] %} 
+                    {% if ev.status == '❓' %}
+                    <button class="btn btn-danger btn-confirm" data-url="{{ url_for('cancel_event_proposal', id=ev._id) }}" data-title="Batalkan Proposal?" data-msg="Apakah Anda yakin ingin membatalkan proposal acara yang Anda ajukan?" data-icon="warning" data-color="#dc3545">Batal</button>
+                    {% elif ev.status == '✅' %}
+                    <button class="btn btn-danger btn-confirm" data-url="{{ url_for('request_delete_event', id=ev._id) }}" data-title="Minta Hapus Acara?" data-msg="Mengajukan permohonan penghapusan acara ini ke Superadmin?" data-icon="warning" data-color="#dc3545">Minta Hapus</button>
+                    {% elif ev.status == '❗' %}
+                    <button class="btn btn-outline-danger btn-confirm" data-url="{{ url_for('cancel_delete_event_request', id=ev._id) }}" data-title="Batalkan Permintaan Hapus?" data-msg="Membatalkan permohonan hapus untuk acara ini?" data-icon="info" data-color="#6c757d">Batal</button>
+                    {% endif %} 
+                  {% else %} 
+                    {% if ev.status == '✅' %}
+                    <button class="btn btn-danger btn-confirm" data-url="{{ url_for('request_delete_event', id=ev._id) }}" data-title="Minta Hapus Acara?" data-msg="Mengajukan permohonan penghapusan acara milik admin lain ke Superadmin?" data-icon="warning" data-color="#dc3545">Minta Hapus</button>
+                    {% endif %} 
+                  {% endif %} 
+                {% endif %}
+              </div>
             </td>
           </tr>
           {% endfor %}
@@ -214,7 +132,7 @@
     </div>
 
     <div class="card p-3 shadow-sm table-responsive">
-      <h5 class="fw-bold text-secondary">Generated Invitations</h5>
+      <h5 class="fw-bold text-secondary mb-3">Generated Invitations</h5>
       <table class="table table-striped align-middle small">
         <thead class="table-dark">
           <tr>
@@ -238,74 +156,30 @@
               {% endif %}
             </td>
             <td>
-              <a
-                href="{{ url_for('invitation', id=invite._id) }}"
-                target="_blank"
-                class="btn btn-sm btn-outline-primary py-0"
-                >Open Link</a
-              >
+              <a href="{{ url_for('invitation', id=invite._id) }}" target="_blank" class="btn btn-sm btn-outline-primary py-1">Open Link</a>
             </td>
             <td>
-              {% if role == 'superadmin' %} {% if invite.status == '❗' %}
-              <!-- Approve Delete untuk Undangan -->
-              <button
-                class="btn btn-sm btn-danger py-0 btn-confirm"
-                data-url="{{ url_for('delete_data', id=invite._id) }}"
-                data-title="Approve Delete Undangan?"
-                data-msg="Menyetujui permohonan dan menghapus undangan ini secara permanen?"
-                data-icon="warning"
-                data-color="#dc3545"
-              >
-                Approve Delete
-              </button>
-              <!-- Reject Delete untuk Undangan -->
-              <button
-                class="btn btn-sm btn-outline-secondary py-0 btn-confirm"
-                data-url="{{ url_for('reject_delete', id=invite._id) }}"
-                data-title="Reject Delete Undangan?"
-                data-msg="Menolak permohonan hapus dan mengaktifkan kembali undangan ini?"
-                data-icon="info"
-                data-color="#6c757d"
-              >
-                Reject Delete
-              </button>
-              {% else %}
-              <button
-                class="btn btn-sm btn-danger py-0 btn-confirm"
-                data-url="{{ url_for('delete_data', id=invite._id) }}"
-                data-title="Hapus Permanen?"
-                data-msg="Menghapus langsung data undangan secara permanen?"
-                data-icon="warning"
-                data-color="#dc3545"
-              >
-                Direct Delete
-              </button>
-              {% endif %} {% elif role == 'admin' %} {% if invite.status == '❗'
-              %}
-              <button
-                class="btn btn-sm btn-outline-warning py-0 btn-confirm"
-                data-url="{{ url_for('cancel_delete_request', id=invite._id) }}"
-                data-title="Batalkan Minta Hapus?"
-                data-msg="Membatalkan permohonan hapus undangan yang telah dikirim?"
-                data-icon="info"
-                data-color="#3085d6"
-              >
-                Batal Minta Hapus
-              </button>
-              {% else %}
-              <button
-                class="btn btn-sm btn-warning py-0 text-white btn-confirm"
-                data-url="{{ url_for('request_delete', id=invite._id) }}"
-                data-title="Minta Hapus Undangan?"
-                data-msg="Mengajukan permohonan penghapusan undangan ini ke Superadmin?"
-                data-icon="warning"
-                data-color="#ffc107"
-              >
-                Minta Hapus
-              </button>
-              {% endif %} {% else %}
-              <span class="text-muted">-</span>
-              {% endif %}
+              <div class="btn-group btn-group-sm" role="group">
+                {% if role in ['superadmin', 'admin'] %}
+                  <button class="btn btn-outline-info py-1" data-bs-toggle="modal" data-bs-target="#detailInviteModal{{ invite._id }}">Detail</button>
+                  <button class="btn btn-outline-warning py-1" data-bs-toggle="modal" data-bs-target="#editInviteModal{{ invite._id }}">Edit</button>
+                {% endif %}
+
+                {% if role == 'superadmin' %} 
+                  {% if invite.status == '❗' %}
+                  <button class="btn btn-outline-danger py-1 btn-confirm" data-url="{{ url_for('delete_data', id=invite._id) }}" data-title="Approve Delete Undangan?" data-msg="Menyetujui permohonan dan menghapus undangan ini secara permanen?" data-icon="warning" data-color="#dc3545">Approve Delete</button>
+                  <button class="btn btn-outline-secondary py-1 btn-confirm" data-url="{{ url_for('reject_delete', id=invite._id) }}" data-title="Reject Delete Undangan?" data-msg="Menolak permohonan hapus dan mengaktifkan kembali undangan ini?" data-icon="info" data-color="#6c757d">Reject Delete</button>
+                  {% else %}
+                  <button class="btn btn-outline-dark py-1 btn-confirm" data-url="{{ url_for('delete_data', id=invite._id) }}" data-title="Hapus Permanen?" data-msg="Menghapus langsung data undangan secara permanen?" data-icon="warning" data-color="#dc3545">Direct Delete</button>
+                  {% endif %} 
+                {% elif role == 'admin' %} 
+                  {% if invite.status == '❗' %}
+                  <button class="btn btn-outline-warning py-1 btn-confirm" data-url="{{ url_for('cancel_delete_request', id=invite._id) }}" data-title="Batalkan Minta Hapus?" data-msg="Membatalkan permohonan hapus undangan yang telah dikirim?" data-icon="info" data-color="#3085d6">Batal</button>
+                  {% else %}
+                  <button class="btn btn-warning py-1 text-white btn-confirm" data-url="{{ url_for('request_delete', id=invite._id) }}" data-title="Minta Hapus Undangan?" data-msg="Mengajukan permohonan penghapusan undangan ini ke Superadmin?" data-icon="warning" data-color="#ffc107">Minta Hapus</button>
+                  {% endif %} 
+                {% endif %}
+              </div>
             </td>
           </tr>
           {% endfor %}
@@ -315,20 +189,183 @@
   </div>
 </div>
 
+{% for ev in events %}
+  {% set clean_date = ev.event_date | replace("-", "") %}
+  {% set cal_link = "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" ~ (ev.event_name | urlencode) ~ "&dates=" ~ clean_date ~ "T100000/" ~ clean_date ~ "T130000&details=Undangan+Digital+Resmi&location=" ~ ((ev.event_location if ev.event_location else 'Jakarta') | urlencode) %}
+  {% set embed_maps_url = "https://maps.google.com/maps?q=" ~ (ev.event_location | urlencode) ~ "&t=&z=15&ie=UTF8&iwloc=&output=embed" %}
+
+<div class="modal fade" id="detailEventModal{{ ev._id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-md">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold">Detail Event</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="text-center mb-3">
+          {% if ev.event_logo and (ev.event_logo.startswith('http://') or ev.event_logo.startswith('https://') or ev.event_logo.startswith('/')) %}
+            <img src="{{ ev.event_logo }}" alt="logo" class="img-thumbnail" style="width: 70px; height: 70px; object-fit: cover;">
+          {% else %}
+            <div class="fs-1">{{ ev.event_logo if ev.event_logo else '🎉' }}</div>
+          {% endif %}
+        </div>
+        
+        <table class="table table-sm table-borderless text-start mb-0">
+          <tr><td class="fw-bold text-secondary w-25">Event Name:</td><td>{{ ev.event_name }}</td></tr>
+          <tr><td class="fw-bold text-secondary">Tanggal:</td><td>{{ ev.event_date }}</td></tr>
+          <tr><td class="fw-bold text-secondary">Waktu:</td><td>{{ ev.event_time if ev.event_time else '10:00 - 13:00' }}</td></tr>
+          <tr><td class="fw-bold text-secondary">Status:</td><td>{{ ev.status }}</td></tr>
+          <tr>
+            <td class="fw-bold text-secondary">Tempat Acara:</td>
+            <td>
+              {{ ev.event_location if ev.event_location else 'Hotel Indonesia' }}
+              <div class="mt-2 border rounded overflow-hidden shadow-sm" style="max-width: 100%; height: 150px;">
+                <iframe src="{{ embed_maps_url }}" style="width: 100%; height: 100%; border: 0;" allowfullscreen="" loading="lazy"></iframe>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td class="fw-bold text-secondary pt-3">Google Calendar:</td>
+            <td class="pt-3">
+              <a href="{{ cal_link }}" target="_blank" class="text-primary text-decoration-none fw-semibold">add to google calendar</a>
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editEventModal{{ ev._id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="" enctype="multipart/form-data">
+        <input type="hidden" name="form_type" value="edit_event">
+        <input type="hidden" name="event_id" value="{{ ev._id }}">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">Edit Event</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body text-start">
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Event Name</label>
+            <input type="text" name="event_name" class="form-control" value="{{ ev.event_name }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Date</label>
+            <input type="date" name="event_date" class="form-control" value="{{ ev.event_date }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Waktu Acara</label>
+            <input type="text" name="event_time" class="form-control" value="{{ ev.event_time if ev.event_time else '10:00 - 13:00' }}" required>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Tempat Acara / Google Maps Search</label>
+            <input type="text" name="event_location" class="form-control location-search" value="{{ ev.event_location }}" placeholder="Cari nama hotel/gedung..." required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Event Logo / Icon</label>
+            <input type="file" name="event_logo" class="form-control" accept="image/*">
+            <div class="form-text text-muted small">Pilih file gambar baru jika ingin mengganti logo acara.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Edit Status</label>
+            <select name="status" class="form-select">
+              <option value="✅" {% if ev.status == '✅' %}selected{% endif %}>Approved (✅)</option>
+              <option value="❓" {% if ev.status == '❓' %}selected{% endif %}>Pending Approval (❓)</option>
+              <option value="❗" {% if ev.status == '❗' %}selected{% endif %}>Pending Deletion (❗)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{% for invite in invitations %}
+<div class="modal fade" id="detailInviteModal{{ invite._id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-md">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold">Detail Invitation</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-start">
+        <table class="table table-sm table-borderless">
+          <tr><td class="fw-bold text-secondary w-25">Guest Name:</td><td>{{ invite.guest_name }}</td></tr>
+          <tr><td class="fw-bold text-secondary">Status:</td><td>{{ invite.status }}</td></tr>
+          <tr><td class="fw-bold text-secondary">Link:</td><td><a href="{{ url_for('invitation', id=invite._id) }}" target="_blank" class="small text-break">{{ request.url_root }}invitation/{{ invite._id }}</a></td></tr>
+          <tr>
+            <td class="fw-bold text-secondary align-middle">QR Code:</td>
+            <td>
+              <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={{ request.url_root }}invitation/{{ invite._id }}" alt="QR Code" class="img-thumbnail" style="width: 110px;">
+            </td>
+          </tr>
+          <tr><td class="fw-bold text-secondary">RSVP Status:</td><td><span class="badge bg-secondary">{{ invite.rsvp if invite.rsvp else 'Belum Konfirmasi' }}</span></td></tr>
+          <tr><td class="fw-bold text-secondary pt-2" colspan="2">Wishes Received:</td></tr>
+          <tr>
+            <td colspan="2">
+              <div class="p-2 border rounded-3 bg-light text-muted small" style="max-height: 100px; overflow-y: auto;">
+                {{ invite.wishes if invite.wishes else 'Belum ada ucapan doa dari tamu ini.' }}
+              </div>
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editInviteModal{{ invite._id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="">
+        <input type="hidden" name="form_type" value="edit_invitation">
+        <input type="hidden" name="invite_id" value="{{ invite._id }}">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">Edit Invitation</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body text-start">
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Guest Name</label>
+            <input type="text" name="guest_name" class="form-control" value="{{ invite.guest_name }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Status</label>
+            <select name="status" class="form-select">
+              <option value="Active" {% if invite.status == 'Active' %}selected{% endif %}>Active</option>
+              <option value="❗" {% if invite.status == '❗' %}selected{% endif %}>Pending Deletion</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    // Menggunakan class baru .btn-confirm agar meng-handle semua skenario tombol dinamis
     const ActionButtons = document.querySelectorAll(".btn-confirm");
-
     ActionButtons.forEach((button) => {
       button.addEventListener("click", function (e) {
         e.preventDefault();
         const targetUrl = this.getAttribute("data-url");
-        const customTitle =
-          this.getAttribute("data-title") || "Apakah Anda yakin?";
-        const customMsg =
-          this.getAttribute("data-msg") ||
-          "Data yang diproses tidak dapat dikembalikan!";
+        const customTitle = this.getAttribute("data-title") || "Apakah Anda yakin?";
+        const customMsg = this.getAttribute("data-msg") || "Data yang diproses tidak dapat dikembalikan!";
         const customIcon = this.getAttribute("data-icon") || "warning";
         const confirmColor = this.getAttribute("data-color") || "#3085d6";
 

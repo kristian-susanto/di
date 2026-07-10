@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Wedding / Event Invitation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap"
+      rel="stylesheet"
+    />
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -11,35 +17,579 @@
     <style>
       body {
         background: #f4f1ea;
-        font-family: "Georgia", serif;
+        font-family: "Playfair Display", "Georgia", serif;
+        overflow-x: hidden;
       }
-      .hero-section {
-        min-height: 100vh;
+
+      /* --- STYLE UNTUK COVER AMPLOP --- */
+      .envelope-cover {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100vh;
+        background:
+          linear-gradient(rgba(244, 241, 234, 0.92), rgba(244, 241, 234, 0.92)),
+          url("https://www.transparenttextures.com/patterns/cream-paper.png"),
+          #fbfaf8;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
         text-align: center;
-        color: #333;
+        z-index: 9999;
+        transition: transform 1.2s cubic-bezier(0.77, 0, 0.175, 1);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        padding: 20px;
+      }
+
+      .envelope-open {
+        transform: translateY(-100vh);
+      }
+
+      .brand-title {
+        text-transform: uppercase;
+        letter-spacing: 3px;
+        color: #8a7b6e;
+        font-size: 1rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .envelope-wrapper {
+        position: relative;
+        cursor: pointer;
+        width: 100%;
+        max-width: 450px;
+        perspective: 1000px;
+      }
+
+      .letter-card {
+        background: #ffffff;
+        padding: 30px 25px;
+        border-radius: 8px;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
+        border: 1px solid #eae5d9;
+        transition: all 0.4s ease;
+        position: relative;
+      }
+
+      .letter-card::before {
+        content: "";
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        border: 1px dashed #d1c7bd;
+        pointer-events: none;
+      }
+
+      .action-seal {
+        background-color: #d63384;
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        font-size: 0.95rem;
+        border-radius: 50px;
+        text-transform: uppercase;
+        font-weight: 600;
+        margin-top: 15px;
+      }
+
+      /* --- STYLE UNTUK ISI UTAMA UNDANGAN --- */
+      .invitation-container {
+        padding: 60px 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .main-content {
+        opacity: 0;
+        transform: translateY(40px);
+        transition:
+          opacity 1.2s ease 0.4s,
+          transform 1.2s ease 0.4s;
+        max-width: 650px;
+        width: 100%;
+      }
+
+      .main-content.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      /* Countdown Styles */
+      .countdown-container {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        margin: 25px 0;
+      }
+
+      .countdown-box {
+        background: #8a7b6e;
+        color: white;
+        padding: 10px;
+        border-radius: 8px;
+        min-width: 70px;
+        text-align: center;
+      }
+
+      .countdown-number {
+        font-size: 1.5rem;
+        font-weight: bold;
+        display: block;
+      }
+
+      .countdown-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        opacity: 0.8;
+      }
+
+      /* Maps Styles */
+      .map-responsive {
+        overflow: hidden;
+        padding-bottom: 56.25%;
+        position: relative;
+        height: 0;
+        border-radius: 12px;
+        margin-top: 15px;
+        border: 1px solid #eae5d9;
+      }
+
+      .map-responsive iframe {
+        left: 0;
+        top: 0;
+        height: 100%;
+        width: 100%;
+        position: absolute;
+      }
+
+      /* List Ucapan Scrollable */
+      .wishes-list {
+        max-height: 300px;
+        overflow-y: auto;
+        text-align: left;
+        border: 1px solid #eae5d9;
+        border-radius: 8px;
+        padding: 15px;
+        background: #fdfcf9;
+      }
+
+      /* Galeri Foto Pre-Wedding */
+      .gallery-img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        border-radius: 8px;
+        transition: transform 0.3s ease;
+      }
+
+      .gallery-img:hover {
+        transform: scale(1.03);
       }
     </style>
   </head>
   <body>
-    <div class="container hero-section">
-      <div
-        class="card p-5 shadow-lg border-0 rounded-4 max-width"
-        style="max-width: 600px; background: #fff"
-      >
-        <p class="text-muted tracking-wide">YOU ARE CORDIALLY INVITED TO</p>
-        <h1 class="display-5 my-3 text-secondary">{{ invite.title }}</h1>
-        <hr class="w-25 mx-auto" />
-        <p class="mt-4 fs-5">Dear, <strong>{{ invite.guest_name }}</strong></p>
-        <p>We would love for you to join us celebrating this special moment.</p>
-        <div class="bg-light p-3 my-4 rounded">
-          <h5 class="mb-1">Save The Date</h5>
-          <p class="mb-0 fw-bold text-dark">{{ invite.date }}</p>
+    <div id="envelopeCover" class="envelope-cover">
+      <div class="brand-title">Digital Invitation</div>
+
+      <div class="envelope-wrapper" onclick="openInvitation()">
+        <div class="letter-card">
+          <p
+            class="text-muted text-uppercase tracking-wider small mb-2"
+            style="font-size: 0.75rem"
+          >
+            We Invite You to The Wedding of
+          </p>
+          <h2 class="h3 fw-normal mb-4" style="color: #2b2d42">
+            {{ invite.title }}
+          </h2>
+          <hr class="w-25 mx-auto my-3" style="border-color: #b5a494" />
+          <div class="my-3">
+            <p class="mb-1 text-muted small" style="font-style: italic">
+              Kepada Yth. Bapak/Ibu/Saudara/i:
+            </p>
+            <h4 class="fw-bold text-dark">{{ invite.guest_name }}</h4>
+          </div>
+          <span class="btn action-seal">Buka Surat</span>
         </div>
-        <p class="text-muted small">Thank You</p>
       </div>
     </div>
+
+    <div class="container invitation-container main-content" id="mainContent">
+      <div
+        class="card p-4 p-md-5 shadow-lg border-0 rounded-4 w-100 bg-white text-center mb-4"
+      >
+        <p class="text-muted tracking-wide text-uppercase mb-2">
+          You Are Cordially Invited To
+        </p>
+        <h1
+          class="display-5 my-2 text-secondary"
+          style="font-family: &quot;Playfair Display&quot;, serif"
+        >
+          {{ invite.title }}
+        </h1>
+        <hr class="w-25 mx-auto my-4" />
+
+        <p class="fs-5">Dear, <strong>{{ invite.guest_name }}</strong></p>
+        <p class="text-muted">
+          Merupakan suatu kebahagiaan bagi kami apabila Bapak/Ibu/Saudara/i
+          berkenan hadir di acara istimewa kami.
+        </p>
+
+        <div class="my-4">
+          <h6 class="text-uppercase text-secondary tracking-wider small">
+            Menghitung Mundur Hari H
+          </h6>
+          <div class="countdown-container" id="countdown">
+            <div class="countdown-box">
+              <span class="countdown-number" id="days">00</span
+              ><span class="countdown-label">Hari</span>
+            </div>
+            <div class="countdown-box">
+              <span class="countdown-number" id="hours">00</span
+              ><span class="countdown-label">Jam</span>
+            </div>
+            <div class="countdown-box">
+              <span class="countdown-number" id="minutes">00</span
+              ><span class="countdown-label">Menit</span>
+            </div>
+            <div class="countdown-box">
+              <span class="countdown-number" id="seconds">00</span
+              ><span class="countdown-label">Detik</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-light p-4 my-4 rounded-3 border">
+          <h5 class="mb-2" style="color: #8a7b6e">Waktu & Tanggal</h5>
+          <p class="mb-3 fw-bold text-dark fs-5">{{ invite.date }}</p>
+
+          <a
+            id="btnCalendar"
+            href="#"
+            target="_blank"
+            class="btn btn-sm btn-outline-dark rounded-pill px-3"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              fill="currentColor"
+              class="bi bi-calendar-plus me-2"
+              viewBox="0 0 16 16"
+            >
+              <path
+                d="M8 7a.5.5 0 0 1 .5.5v2H10a.5.5 0 0 1 0 1H8.5V12a.5.5 0 0 1-1 0v-1.5H6a.5.5 0 0 1 0-1h1.5v-2A.5.5 0 0 1 8 7"
+              />
+              <path
+                d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"
+              />
+            </svg>
+            Simpan di Google Calendar
+          </a>
+        </div>
+
+        <div class="my-4 text-center">
+          <h5 style="color: #8a7b6e" class="mb-2">Lokasi Acara</h5>
+          <p class="text-dark mb-3 px-3">
+            <strong>Gedung Pertemuan Utama</strong><br /><span
+              class="text-muted small"
+              >Jl. Anggrek No. 123, Kota Pusat, Indonesia</span
+            >
+          </p>
+
+          <a
+            href="https://maps.google.com"
+            target="_blank"
+            class="btn btn-primary rounded-pill px-4 mb-3"
+            style="background-color: #8a7b6e; border: none"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              fill="currentColor"
+              class="bi bi-geo-alt-fill me-2"
+              viewBox="0 0 16 16"
+            >
+              <path
+                d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10m0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6"
+              />
+            </svg>
+            See Location (Google Maps)
+          </a>
+
+          <div class="map-responsive">
+            <iframe
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3966.27372778396!2d106.8248881!3d-6.2275605!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNsKwMTMnMzkuMiJTIDEwNlw0OScyOS42IkU!5e0!3m2!1sid!2sid!4v1625000000000!5m2!1sid!2sid"
+              width="600"
+              height="450"
+              style="border: 0"
+              allowfullscreen=""
+              loading="lazy"
+            >
+            </iframe>
+          </div>
+        </div>
+
+        <div class="my-5">
+          <hr class="my-4" />
+          <h5 style="color: #8a7b6e" class="mb-4">Our Moments</h5>
+          <div class="row g-3">
+            <div class="col-6 col-md-4">
+              <img
+                src="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?w=500"
+                class="gallery-img"
+                alt="Prewedding 1"
+              />
+            </div>
+            <div class="col-6 col-md-4">
+              <img
+                src="https://images.unsplash.com/photo-1519741497674-611481863552?w=500"
+                class="gallery-img"
+                alt="Prewedding 2"
+              />
+            </div>
+            <div class="col-6 col-md-4">
+              <img
+                src="https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=500"
+                class="gallery-img"
+                alt="Prewedding 3"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="my-5 p-4 rounded-3 border bg-light text-start">
+          <h5 style="color: #8a7b6e" class="text-center mb-3">
+            RSVP Attendance
+          </h5>
+          <form method="POST" action="">
+            <input type="hidden" name="form_type" value="rsvp" />
+            <div class="mb-3">
+              <label class="form-label fw-bold text-secondary">Nama Tamu</label>
+              <input
+                type="text"
+                name="guest_name"
+                class="form-control"
+                value="{{ invite.guest_name }}"
+                readonly
+              />
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold text-secondary"
+                >Jumlah Kehadiran (Total Guest)</label
+              >
+              <input
+                type="number"
+                name="total_guest"
+                class="form-control"
+                placeholder="Contoh: 2"
+                min="1"
+                required
+              />
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold text-secondary"
+                >Konfirmasi Kehadiran</label
+              >
+              <div class="d-flex gap-3">
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="radio"
+                    name="attendance"
+                    id="attend"
+                    value="Attend"
+                    checked
+                  />
+                  <label class="form-check-label" href="#attend"
+                    >Attend (Hadir)</label
+                  >
+                </div>
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="radio"
+                    name="attendance"
+                    id="not_attend"
+                    value="Not Attend"
+                  />
+                  <label class="form-check-label" href="#not_attend"
+                    >Not Attend (Tidak Hadir)</label
+                  >
+                </div>
+              </div>
+            </div>
+            <button
+              type="submit"
+              class="btn w-100 text-white rounded-pill"
+              style="background-color: #8a7b6e"
+            >
+              Kirim Konfirmasi
+            </button>
+          </form>
+        </div>
+
+        <div class="my-5 text-start">
+          <h5 style="color: #8a7b6e" class="text-center mb-3">
+            Wedding Wishes
+          </h5>
+          <form method="POST" action="" class="mb-4">
+            <input type="hidden" name="form_type" value="wishes" />
+            <div class="mb-3">
+              <label class="form-label fw-bold text-secondary">Nama</label>
+              <input
+                type="text"
+                name="wishes_name"
+                class="form-control"
+                value="{{ invite.guest_name }}"
+                readonly
+              />
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold text-secondary"
+                >Ucapan & Doa (Wishes)</label
+              >
+              <textarea
+                name="wishes_text"
+                class="form-control"
+                rows="3"
+                placeholder="Tulis ucapan selamat Anda di sini..."
+                required
+              ></textarea>
+            </div>
+            <button
+              type="submit"
+              class="btn w-100 text-white rounded-pill"
+              style="background-color: #d63384; border: none"
+            >
+              Kirim Ucapan
+            </button>
+          </form>
+
+          <h6 class="fw-bold mb-2 text-secondary">
+            Ucapan dari Para Tamu ({{ wishes|length if wishes else 0 }}):
+          </h6>
+          <div class="wishes-list">
+            {% if wishes %} {% for w in wishes %}
+            <div class="border-bottom pb-2 mb-2">
+              <strong class="text-dark">{{ w.name }}</strong>
+              <p class="mb-0 text-muted small" style="font-style: italic">
+                "{{ w.text }}"
+              </p>
+            </div>
+            {% endfor %} {% else %}
+            <p class="text-muted text-center small my-3">
+              Belum ada ucapan. Jadilah yang pertama memberikan doa!
+            </p>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="mt-5 pt-4 text-center">
+          <h2
+            style="
+              font-family: &quot;Great Vibes&quot;, cursive;
+              color: #8a7b6e;
+            "
+            class="display-4"
+          >
+            Terima Kasih
+          </h2>
+          <p class="text-muted mt-2 small">
+            Merupakan suatu kehormatan & kebahagiaan bagi kami atas kehadiran
+            serta doa restu Bapak/Ibu/Saudara/i sekalian.
+          </p>
+          <p class="fw-bold mt-4" style="letter-spacing: 2px; color: #333">
+            Kami Yang Berbahagia
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const targetDateStr = "{{ invite.date }}";
+
+      function openInvitation() {
+        document.getElementById("envelopeCover").classList.add("envelope-open");
+        document.getElementById("mainContent").classList.add("show");
+        setTimeout(function () {
+          document.getElementById("envelopeCover").style.display = "none";
+        }, 1200);
+
+        initCountdown();
+        initCalendarLink();
+      }
+
+      // LOGIK COUNTDOWN TIMER
+      function initCountdown() {
+        let targetDate = new Date(targetDateStr).getTime();
+        if (isNaN(targetDate)) {
+          targetDate = new Date().getTime() + 7 * 24 * 60 * 60 * 1000; // Default simulasi H+7 jika parsing error
+        }
+
+        const timerInterval = setInterval(function () {
+          const now = new Date().getTime();
+          const distance = targetDate - now;
+
+          if (distance < 0) {
+            clearInterval(timerInterval);
+            document.getElementById("countdown").innerHTML =
+              "<span class='fw-bold text-danger text-uppercase'>Acara Telah Berlangsung</span>";
+            return;
+          }
+
+          const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+          const hours = Math.floor(
+            (distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
+          );
+          const minutes = Math.floor(
+            (distance % (1000 * 60 * 60)) / (1000 * 60),
+          );
+          const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+          document.getElementById("days").innerText =
+            days < 10 ? "0" + days : days;
+          document.getElementById("hours").innerText =
+            hours < 10 ? "0" + hours : hours;
+          document.getElementById("minutes").innerText =
+            minutes < 10 ? "0" + minutes : minutes;
+          document.getElementById("seconds").innerText =
+            seconds < 10 ? "0" + seconds : seconds;
+        }, 1000);
+      }
+
+      // LOGIK GOOGLE CALENDAR
+      function initCalendarLink() {
+        const title = encodeURIComponent("{{ invite.title }}");
+        let baseDate = new Date(targetDateStr);
+        if (isNaN(baseDate.getTime())) baseDate = new Date();
+
+        const year = baseDate.getFullYear();
+        const month = String(baseDate.getMonth() + 1).padStart(2, "0");
+        const day = String(baseDate.getDate()).padStart(2, "0");
+
+        const dateParam = `${year}${month}${day}T090000/${year}${month}${day}T130000`;
+        const details = encodeURIComponent(
+          "Undangan digital formal untuk menghadiri acara: " +
+            "{{ invite.title }}",
+        );
+        const location = encodeURIComponent(
+          "Gedung Pertemuan Utama, Jl. Anggrek No.123",
+        );
+
+        const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dateParam}&details=${details}&location=${location}&sf=true&output=xml`;
+
+        document
+          .getElementById("btnCalendar")
+          .setAttribute("href", googleCalendarUrl);
+      }
+    </script>
   </body>
 </html>

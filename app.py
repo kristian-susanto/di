@@ -19,6 +19,9 @@ users_collection = db.users
 invitations_collection = db.invitations
 events_collection = db.events
 
+UPLOAD_FOLDER = 'static/uploads'
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 # --- DECORATORS (Role & Auth Protection) ---
 def login_required(f):
     @wraps(f)
@@ -121,27 +124,26 @@ def manage_data():
     if request.method == 'POST':
         form_type = request.form.get('form_type')
         
-        # A. FITUR CREATE EVENT (Admin & Superadmin)
+        # A. FITUR CREATE EVENT
         if form_type == 'create_event':
-            if current_role not in ['superadmin', 'admin']:
-                flash("Unauthorized.", "danger")
-                return redirect(url_for('manage_data'))
-                
             event_name = request.form.get('event_name')
             event_date = request.form.get('event_date')
-            status = "✅" if current_role == 'superadmin' else "❓"
+            event_time = request.form.get('event_time', '10:00 - 13:00')
+            event_location = request.form.get('event_location', 'Gedung Pertemuan Utama')
+            event_logo = request.form.get('event_logo', '🎉') # default berupa emoji jika kosong
+            
+            status = '❓' if current_role == 'admin' else '✅'
             
             events_collection.insert_one({
                 "event_name": event_name,
                 "event_date": event_date,
+                "event_time": event_time,
+                "event_location": event_location,
+                "event_logo": event_logo,
                 "status": status,
                 "created_by": username
             })
-            
-            # --- KODE YANG DIPERSINGKAT ---
-            msg = "Event created successfully!" if status == "✅" else "Event proposal submitted to Superadmin!"
-            flash(msg, "success") # Langsung diset ke "success" untuk kedua kondisi
-            
+            flash("Event created successfully!", "success")
             return redirect(url_for('manage_data'))
             
         # B. FITUR CREATE INVITATION (Admin & Superadmin)
@@ -173,6 +175,58 @@ def manage_data():
             else:
                 flash("Acara tidak ditemukan atau Anda tidak memiliki hak akses untuk acara ini.", "danger")
                 
+            return redirect(url_for('manage_data'))
+        
+        # C. FITUR EDIT EVENT
+        if form_type == 'edit_event':
+            event_id = request.form.get('event_id')
+            event_name = request.form.get('event_name')
+            event_date = request.form.get('event_date')
+            event_time = request.form.get('event_time')
+            event_location = request.form.get('event_location')
+            status = request.form.get('status')
+            
+            # Ambil data lama terlebih dahulu agar jika tidak upload gambar baru, logo lama tidak hilang
+            current_event = events_collection.find_one({"_id": ObjectId(event_id)})
+            event_logo_path = current_event.get('event_logo', '🎉') if current_event else '🎉'
+            
+            # PROSES UPLOAD GAMBAR LOGO
+            if 'event_logo' in request.files:
+                file = request.files['event_logo']
+                if file and file.filename != '':
+                    # Simpan file ke dalam folder static/uploads
+                    filename = f"logo_{event_id}_{file.filename}"
+                    file_path = os.path.join(UPLOAD_FOLDER, filename)
+                    file.save(file_path)
+                    # Simpan path yang bisa diakses oleh browser ke database
+                    event_logo_path = f"/{UPLOAD_FOLDER}/{filename}"
+            
+            # Update ke MongoDB
+            events_collection.update_one(
+                {"_id": ObjectId(event_id)},
+                {"$set": {
+                    "event_name": event_name,
+                    "event_date": event_date,
+                    "event_time": event_time,
+                    "event_location": event_location,
+                    "event_logo": event_logo_path,
+                    "status": status
+                }}
+            )
+            flash("Event berhasil diperbarui!", "success")
+            return redirect(url_for('manage_data'))
+
+        # D. FITUR EDIT INVITATION (Saves Edit Modal)
+        elif form_type == 'edit_invitation':
+            invite_id = request.form.get('invite_id')
+            invitations_collection.update_one(
+                {"_id": ObjectId(invite_id)},
+                {"$set": {
+                    "guest_name": request.form.get('guest_name'),
+                    "status": request.form.get('status')
+                }}
+            )
+            flash("Invitation record updated successfully!", "success")
             return redirect(url_for('manage_data'))
 
     # ==========================================
