@@ -3,8 +3,11 @@
 
 <div class="container my-2">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold text-dark">👥 Manage People & Settings</h2>
-        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-sm">Kembali ke Dashboard</a>
+        <h2 class="fw-bold text-dark">👤 Manage People & Settings</h2>
+        <!-- TOMBOL UNTUK MEMBUKA MODAL REGISTER USER BARU -->
+        <button type="button" class="btn btn-success fw-bold" data-bs-toggle="modal" data-bs-target="#addUserModal">
+            Tambah User Baru
+        </button>
     </div>
 
     <div class="row g-4">
@@ -15,15 +18,37 @@
                     <form action="/superadmin/manage-people" method="POST">
                         <input type="hidden" name="form_type" value="toggle_gate">
                         
-                        <div class="form-check form-switch mb-3">
+                        <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" name="allow_registration" id="regSwitch" {% if settings.allow_registration %}checked{% endif %}>
                             <label class="form-check-label fw-semibold" for="regSwitch">Buka Halaman Registrasi</label>
                         </div>
 
-                        <div class="form-check form-switch mb-4">
+                        <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" name="allow_login" id="loginSwitch" {% if settings.allow_login %}checked{% endif %}>
                             <label class="form-check-label fw-semibold" for="loginSwitch">Buka Halaman Login</label>
-                            <div class="form-text text-muted small">Jika dinonaktifkan, hanya akun dengan role Superadmin yang dapat masuk.</div>
+                        </div>
+
+                        <!-- FITUR BARU: Switch Dashboard -->
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" name="allow_dashboard" id="dashSwitch" {% if settings.allow_dashboard %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="dashSwitch">Buka Akses Dashboard</label>
+                        </div>
+
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" name="allow_profile" id="profileSwitch" {% if settings.allow_profile %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="profileSwitch">Buka Akses Halaman Profile</label>
+                        </div>
+
+                        <!-- FITUR BARU: Switch Manage Data -->
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" name="allow_manage_data" id="manageSwitch" {% if settings.allow_manage_data %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="manageSwitch">Buka Akses Manage Data</label>
+                        </div>
+
+                        <!-- FITUR BARU: Switch Buku Tamu -->
+                        <div class="form-check form-switch mb-4">
+                            <input class="form-check-input" type="checkbox" name="allow_guestbook" id="gbookSwitch" {% if settings.allow_guestbook %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="gbookSwitch">Buka Akses Buku Tamu</label>
                         </div>
 
                         <button type="submit" class="btn btn-primary w-100 py-2">Simpan Pengaturan</button>
@@ -43,7 +68,7 @@
                                     <th class="px-3">Username</th>
                                     <th>Email</th>
                                     <th>Role</th>
-                                    <th class="text-center" style="width: 250px;">Aksi</th>
+                                    <th class="text-center" style="width: 280px;">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -51,66 +76,26 @@
                                 <tr>
                                     <td class="px-3 fw-semibold">{{ u.username }}</td>
                                     <td>{{ u.email }}</td>
-                                    <td>
-                                        <span class="badge {% if u.role == 'superadmin' %}bg-danger{% elif u.role == 'admin' %}bg-warning text-dark{% elif u.role == 'usher' %}bg-info text-dark{% else %}bg-secondary{% endif %}">
-                                            {{ u.role | upper }}
-                                        </span>
-                                    </td>
+                                    <td>{{ u.role | capitalize }}</td>
                                     <td class="text-center">
-                                        <div class="d-flex justify-content-center gap-2">
-                                            {% if u.role == 'usher' %}
-                                            <button type="button" class="btn btn-sm btn-warning fw-semibold text-dark" data-bs-toggle="modal" data-bs-target="#editUsherModal-{{ u._id }}">
-                                                ✏️ Edit
+                                        <!-- <div class="d-flex justify-content-center gap-1 flex-wrap"></div> -->
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button type="button" class="btn btn-sm btn-outline-info fw-semibold" data-bs-toggle="modal" data-bs-target="#detailUserModal-{{ u._id }}">
+                                                Detail
+                                            </button>
+
+                                            {% if u.role != 'superadmin' or role == 'superadmin' %}
+                                            <button type="button" class="btn btn-sm btn-outline-warning fw-semibold" data-bs-toggle="modal" data-bs-target="#editUserModal-{{ u._id }}">
+                                                Edit
                                             </button>
                                             {% endif %}
                                             
-                                            <a href="/superadmin/delete-user/{{ u._id }}" class="btn btn-sm btn-danger fw-semibold" onclick="return confirm('Apakah Anda yakin ingin menghapus pengguna {{ u.username }}?')">
-                                                🗑️ Delete
-                                            </a>
+                                            <button type="button" class="btn btn-sm btn-outline-danger fw-semibold btn-delete-user" data-url="/superadmin/delete-user/{{ u._id }}" data-username="{{ u.username }}">
+                                                Hapus
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
-
-                                {% if u.role == 'usher' %}
-                                <div class="modal fade" id="editUsherModal-{{ u._id }}" tabindex="-1" aria-labelledby="editUsherModalLabel" aria-hidden="true">
-                                    <div class="modal-dialog modal-dialog-centered">
-                                        <div class="modal-content">
-                                            <div class="modal-header bg-dark text-white">
-                                                <h5 class="modal-title" id="editUsherModalLabel">Izin Akses Acara: <strong>{{ u.username }}</strong></h5>
-                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                                            </div>
-                                            <form action="/superadmin/manage-people" method="POST">
-                                                <div class="modal-body text-start">
-                                                    <input type="hidden" name="form_type" value="assign_usher_events">
-                                                    <input type="hidden" name="usher_id" value="{{ u._id }}">
-                                                    
-                                                    <p class="small text-muted mb-3">Centang acara di bawah ini untuk memberikan izin kepada Usher melakukan manajemen buku tamu:</p>
-                                                    
-                                                    <div class="border rounded p-3 bg-light" style="max-height: 250px; overflow-y: auto;">
-                                                        {% if events %}
-                                                            {% for ev in events %}
-                                                            <div class="form-check mb-2">
-                                                                <input class="form-check-input" type="checkbox" name="allowed_events" value="{{ ev._id }}" id="check-{{ u._id }}-{{ ev._id }}" {% if u.allowed_events and ev._id in u.allowed_events %}checked{% endif %}>
-                                                                <label class="form-check-label fw-medium" for="check-{{ u._id }}-{{ ev._id }}">
-                                                                    {{ ev.event_name }}
-                                                                </label>
-                                                            </div>
-                                                            {% endfor %}
-                                                        {% else %}
-                                                            <div class="text-center text-muted small py-2">Belum ada acara dengan status 'Approved' yang tersedia.</div>
-                                                        {% endif %}
-                                                    </div>
-                                                </div>
-                                                <div class="modal-footer bg-light">
-                                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
-                                                    <button type="submit" class="btn btn-success btn-sm fw-bold">Simpan Perubahan</button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                                {% endif %}
-
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -120,5 +105,262 @@
         </div>
     </div>
 </div>
+
+<!-- MODAL TAMBAH USER BARU (REGISTER BY SUPERADMIN) -->
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold" id="addUserModalLabel">Buat Pengguna Baru</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="/superadmin/manage-people" method="POST">
+                <input type="hidden" name="form_type" value="add_user">
+                
+                <div class="modal-body text-start">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Username</label>
+                        <input type="text" name="username" class="form-control" placeholder="Masukkan username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Email Address</label>
+                        <input type="email" name="email" class="form-control" placeholder="contoh@email.com" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Password</label>
+                        <input type="password" name="password" class="form-control" placeholder="Masukkan password akun" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Role Akses</label>
+                        <select name="role" class="form-select" required>
+                            <option value="user" selected>User (Guest/Client)</option>
+                            <option value="usher">Usher (Event Assistant)</option>
+                            <option value="admin">Admin</option>
+                            <option value="superadmin">Superadmin</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-success btn-sm fw-bold">Daftarkan User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% for u in users %}
+    <!-- MODAL DETAIL PENGGUNA -->
+    <div class="modal fade" id="detailUserModal-{{ u._id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-dark">
+                    <h5 class="modal-title fw-bold">👁️ Detail Pengguna</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-start">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td class="fw-bold text-secondary w-25">Username:</td>
+                            <td>{{ u.username }}</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-bold text-secondary">Email:</td>
+                            <td>{{ u.email }}</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-bold text-secondary">Role:</td>
+                            <td>
+                                <span class="badge {% if u.role == 'superadmin' %}bg-danger{% elif u.role == 'admin' %}bg-warning text-dark{% elif u.role == 'usher' %}bg-info text-dark{% else %}bg-secondary{% endif %}">
+                                    {{ u.role | capitalize }}
+                                </span>
+                            </td>
+                        </tr>
+                        
+                        <!-- KONDISI TAMPILAN IZIN AKSES ACARA (SUPERADMIN & USHER) -->
+                        {% if u.role == 'superadmin' %}
+                        <tr>
+                            <td class="fw-bold text-secondary align-top">Izin Acara:</td>
+                            <td>
+                                <span class="badge bg-success">Full Access</span>
+                                <small class="text-muted d-block mt-1"><em>Superadmin otomatis memiliki izin penuh untuk mengelola semua acara yang terdaftar di sistem.</em></small>
+                            </td>
+                        </tr>
+                        {% elif u.role == 'usher' %}
+                        <tr>
+                            <td class="fw-bold text-secondary align-top">Izin Acara:</td>
+                            <td>
+                                {% set usher_events = [] %}
+                                {% for ev in events %}
+                                    {% if u.allowed_events and ev._id|string in u.allowed_events %}
+                                        {% set _ = usher_events.append(ev.event_name ~ " (" ~ ev.event_date ~ ")") %}
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if usher_events %}
+                                    <ul class="mb-0 ps-3 text-dark small fw-semibold">
+                                    {% for name in usher_events %}
+                                        <li class="mb-1">🎉 {{ name }}</li>
+                                    {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <span class="text-muted small"><em>Belum memiliki izin akses acara apapun.</em></span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="editUserModal-{{ u._id }}" tabindex="-1" aria-labelledby="editUserModalLabel-{{ u._id }}" aria-hidden="true">
+        <div class="modal-dialog modal-md">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold" id="editUserModalLabel-{{ u._id }}">📝 Edit Pengguna: {{ u.username }}</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="/superadmin/manage-people" method="POST">
+                    <input type="hidden" name="form_type" value="edit_user_unified">
+                    <input type="hidden" name="user_id" value="{{ u._id }}">
+                    
+                    <div class="modal-body text-start">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Role Akses</label>
+                            <select name="role" class="form-select role-select" data-user-id="{{ u._id }}" {% if u.role == 'superadmin' %}disabled{% endif %} required>
+                                <option value="user" {% if u.role == 'user' %}selected{% endif %}>User (Guest/Client)</option>
+                                <option value="usher" {% if u.role == 'usher' %}selected{% endif %}>Usher (Event Assistant)</option>
+                                <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>Admin</option>
+                                <option value="superadmin" {% if u.role == 'superadmin' %}selected{% endif %}>Superadmin</option>
+                            </select>
+                            {% if u.role == 'superadmin' %}
+                                <input type="hidden" name="role" value="superadmin">
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Password Baru</label>
+                            <input type="password" name="password" class="form-control" placeholder="Kosongkan jika tidak ingin mengubah password">
+                        </div>
+
+                        <div id="eventAccessContainer-{{ u._id }}" {% if u.role != 'usher' and u.role != 'superadmin' %}style="display: none;"{% endif %}>
+                            <hr class="my-4">
+                            <h6 class="fw-bold text-secondary mb-2">
+                                {% if u.role == 'superadmin' %}
+                                    🔒 Izin Akses Acara (Superadmin - Semua Acara Terbuka)
+                                {% else %}
+                                    Izin Akses Acara (Khusus Role Usher)
+                                {% endif %}
+                            </h6>
+                            <p class="text-muted small mb-3">
+                                {% if u.role == 'superadmin' %}
+                                    Sebagai Superadmin, Anda memiliki hak penuh ke semua acara (Akses Dikunci).
+                                {% else %}
+                                    Tentukan acara apa saja yang boleh dikelola oleh akun pendukung/usher ini.
+                                {% endif %}
+                            </p>
+                            
+                            <div class="p-3 bg-light rounded border" style="max-height: 180px; overflow-y: auto;">
+                                {% if events %}
+                                    {% for ev in events %}
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" name="allowed_events" value="{{ ev._id }}" id="ev_{{ u._id }}_{{ ev._id }}"
+                                        {% if u.role == 'superadmin' %}
+                                            checked disabled
+                                        {% elif u.allowed_events and ev._id|string in u.allowed_events %}
+                                            checked
+                                        {% endif %}>
+                                        <label class="form-check-label small" for="ev_{{ u._id }}_{{ ev._id }}">
+                                            📅 {{ ev.event_name }} <span class="text-muted">({{ ev.event_date }})</span>
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="text-center text-muted py-2 small">Belum ada data acara tersedia.</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-success btn-sm fw-bold">Simpan Perubahan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endfor %}
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const deleteButtons = document.querySelectorAll(".btn-delete-user");
+        deleteButtons.forEach((button) => {
+            button.addEventListener("click", function (e) {
+                e.preventDefault();
+                const targetUrl = this.getAttribute("data-url");
+                const username = this.getAttribute("data-username");
+
+                Swal.fire({
+                    title: 'Apakah Anda yakin?',
+                    text: `Pengguna "${username}" akan dihapus secara permanen dari sistem!`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#dc3545',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Ya, Hapus!',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.location.href = targetUrl;
+                    }
+                });
+            });
+        });
+
+        const roleSelectors = document.querySelectorAll(".role-select");
+        roleSelectors.forEach((select) => {
+            select.addEventListener("change", function () {
+                const userId = this.getAttribute("data-user-id");
+                const containerIzin = document.getElementById(`eventAccessContainer-${userId}`);
+                
+                if (containerIzin) {
+                    // Jika memilih usher, tampilkan kontainer
+                    if (this.value === "usher") {
+                        containerIzin.style.display = "block";
+                        
+                        // Kembalikan ke mode edit (aktifkan checkbox kembali)
+                        const checkboxes = containerIzin.querySelectorAll("input[type='checkbox']");
+                        checkboxes.forEach(cb => cb.disabled = false);
+                    } 
+                    // Jika memilih superadmin (misal di masa depan ada role up-grade)
+                    else if (this.value === "superadmin") {
+                        containerIzin.style.display = "block";
+                        const checkboxes = containerIzin.querySelectorAll("input[type='checkbox']");
+                        checkboxes.forEach(cb => {
+                            cb.checked = true;
+                            cb.disabled = true;
+                        });
+                    } 
+                    // Jika memilih admin atau user biasa, sembunyikan kontainer
+                    else {
+                        containerIzin.style.display = "none";
+                        const checkboxes = containerIzin.querySelectorAll("input[type='checkbox']");
+                        checkboxes.forEach(cb => {
+                            cb.checked = false;
+                            cb.disabled = false;
+                        });
+                    }
+                }
+            });
+        });
+    });
+</script>
 
 {% endblock %}

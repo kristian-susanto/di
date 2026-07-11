@@ -87,30 +87,54 @@
     </div>
     {% endif %}
 </div>
-
-<!-- SCRIPT UNTUK MENU SWITCH DAN HANDLING QR SCANNER -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
+
 <script>
-    // Fungsi untuk memuat ulang halaman berdasarkan acara yang dipilih dari dropdown
     function switchEvent(eventId) {
         window.location.href = "{{ url_for('usher_guestbook') }}?event_id=" + eventId;
     }
 
-    // Inisialisasi QR Code Scanner jika elemen reader tersedia (punya izin)
+    // Konfigurasi dasar untuk SweetAlert2 Toast
+    const Toast = Swal.mixin({
+        toast: true,
+        position: 'top', // Tampil di bagian atas tengah layar
+        showConfirmButton: false, // Menghilangkan tombol OK
+        timer: 5000, // Durasi tampil 5 detik (5000 ms)
+        timerProgressBar: true, // Menampilkan progress bar waktu berjalan
+        didOpen: (toast) => {
+            toast.addEventListener('mouseenter', Swal.stopTimer)
+            toast.addEventListener('mouseleave', Swal.resumeTimer)
+        }
+    });
+
     document.addEventListener("DOMContentLoaded", function () {
         const readerElement = document.getElementById('reader');
         if (!readerElement) return;
 
         const html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader", { fps: 10, qrbox: 250 }, /* verbose= */ false
+            "reader", { fps: 10, qrbox: 250 }, false
         );
 
         function onScanSuccess(decodedText, decodedResult) {
-            // Hentikan scan sementara saat memproses data untuk menghindari double entry
+            // Hentikan scan sementara agar tidak menembak request berkali-kali
             html5QrcodeScanner.clear();
 
-            // Kirim request Check-In ke Backend menggunakan fetch API
-            fetch(`/usher/check-in/${decodedText}`, {
+            // Ekstrak ID dari URL jika ter-scan penuh
+            let invitationId = decodedText;
+            if (decodedText.includes('/invitation/')) {
+                const parts = decodedText.split('/invitation/');
+                invitationId = parts[parts.length - 1].split(/[?#]/)[0];
+            }
+
+            // Notifikasi awal bahwa sistem sedang memproses
+            Toast.fire({
+                icon: 'info',
+                title: 'Sedang memproses kehadiran...'
+            });
+
+            // Kirim request ke backend
+            fetch(`/usher/check-in/${invitationId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -119,16 +143,29 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    alert(data.message);
+                    Toast.fire({
+                        icon: 'success',
+                        title: data.message // Pesan sukses dari backend (ex: "Berhasil! Kehadiran atas nama 'a' telah dicatat")
+                    }).then(() => {
+                        // Refresh halaman otomatis setelah toast selesai/ditutup
+                        window.location.reload();
+                    });
                 } else {
-                    alert("Gagal: " + data.message);
+                    Toast.fire({
+                        icon: 'error',
+                        title: data.message || 'Gagal memproses kehadiran.'
+                    }).then(() => {
+                        window.location.reload();
+                    });
                 }
-                // Muat ulang halaman agar tabel ter-update secara realtime
-                window.location.reload();
             })
             .catch(err => {
-                alert("Terjadi kesalahan jaringan atau server.");
-                window.location.reload();
+                Toast.fire({
+                    icon: 'error',
+                    title: 'Terjadi kesalahan jaringan atau server.'
+                }).then(() => {
+                    window.location.reload();
+                });
             });
         }
 

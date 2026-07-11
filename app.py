@@ -63,26 +63,27 @@ def view_invitation(id):
     if not invite:
         return "Undangan tidak ditemukan", 404
         
+    # FITUR BARU: Cek jika link telah dinonaktifkan/pasif oleh Admin/Superadmin
+    if not invite.get('is_active', True):
+        return render_template_string('''
+            <!DOCTYPE html>
+            <html>
+            <head><title>Undangan Nonaktif</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"></head>
+            <body class="bg-light d-flex align-items-center justify-content-center" style="height: 100vh;">
+                <div class="card p-5 text-center shadow" style="max-width: 500px;">
+                    <h1 class="text-danger mb-3">⚠️ Undangan Tidak Aktif</h1>
+                    <p class="text-muted">Maaf, tautan undangan digital ini sudah dinonaktifkan atau masa berlakunya telah habis.</p>
+                </div>
+            </body>
+            </html>
+        '''), 403
+        
     event = events_collection.find_one({"_id": invite['event_id']})
+    current_rsvp = rsvps_collection.find_one({"invitation_id": ObjectId(id), "guest_name": invite['guest_name']})
+    all_wishes = list(rsvps_collection.find({"event_id": invite['event_id'], "wishes": {"$ne": "", "$exists": True}}))
+    qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={id}"
     
-    current_rsvp = rsvps_collection.find_one({
-        "invitation_id": ObjectId(id),
-        "guest_name": invite['guest_name']
-    })
-    
-    # 🛠️ PERBAIKAN: Cari ucapan berdasarkan event_id, bukan invitation_id
-    all_wishes = list(rsvps_collection.find({
-        "event_id": invite['event_id'],
-        "wishes": {"$ne": "", "$exists": True}
-    }))
-    
-    return render_template(
-        'invitation.html', 
-        invite=invite, 
-        event=event, 
-        current_rsvp=current_rsvp, 
-        all_wishes=all_wishes
-    )
+    return render_template('invitation.html', invite=invite, event=event, current_rsvp=current_rsvp, all_wishes=all_wishes, qr_code_url=qr_code_url)
 
 @app.route('/invitation/<id>/rsvp', methods=['POST'])
 def submit_rsvp(id):
@@ -168,13 +169,30 @@ def submit_wishes(id):
 # Tambahkan inisialisasi koleksi baru di bagian MongoDB Connection
 settings_collection = db.settings
 
-# --- HELPER FUNCTION UNTUK PENGATURAN GLOBAL ---
 def get_global_settings():
     settings = settings_collection.find_one({"type": "global_config"})
     if not settings:
-        default = {"type": "global_config", "allow_registration": True, "allow_login": True}
+        default = {
+            "type": "global_config", 
+            "allow_registration": True, 
+            "allow_login": True,
+            "allow_dashboard": True,    
+            "allow_manage_data": True,  
+            "allow_guestbook": True,
+            "allow_profile": True       # Pengaturan baru untuk halaman Profile
+        }
         settings_collection.insert_one(default)
         return default
+    
+    # Memastikan key baru selalu ter-inisialisasi otomatis jika belum ada di DB
+    updated = False
+    for key in ["allow_dashboard", "allow_manage_data", "allow_guestbook", "allow_profile"]:
+        if key not in settings:
+            settings[key] = True
+            updated = True
+    if updated:
+        settings_collection.update_one({"type": "global_config"}, {"$set": settings})
+        
     return settings
 
 # --- MODIFIKASI RUTE REGISTER ---
@@ -248,12 +266,24 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    settings = get_global_settings()
+    # Jika ditutup, hanya role superadmin yang tetap bisa akses
+    if not settings.get('allow_dashboard', True) and session['user']['role'] != 'superadmin':
+        flash("Halaman Dashboard saat ini sedang ditutup oleh Superadmin.", "danger")
+        return redirect(url_for('logout')) # atau return redirect ke halaman lain yang diizinkan
+        
     return render_template('dashboard.html', user=session['user'])
 
 @app.route('/manage', methods=['GET', 'POST'])
 @login_required
 @roles_required('superadmin', 'admin', 'usher')
 def manage_data():
+    settings = get_global_settings()
+    # Jika ditutup, hanya role superadmin yang tetap bisa akses
+    if not settings.get('allow_manage_data', True) and session['user']['role'] != 'superadmin':
+        flash("Halaman Pengelolaan Data saat ini sedang ditutup oleh Superadmin.", "danger")
+        return redirect(url_for('dashboard'))
+
     current_role = session['user']['role']
     username = session['user']['username']
     
@@ -265,9 +295,8 @@ def manage_data():
             event_name = request.form.get('event_name')
             event_date = request.form.get('event_date')
             event_time = request.form.get('event_time', '10:00 - 13:00')
-            # LOKASI DIUBAH MENJADI GREAT WALL OF CHINA
-            event_location = request.form.get('event_location', 'great wall of china Huairou District, China, 101406')
-            event_logo = '🎉' # default berupa emoji saat pembuatan awal instan
+            event_location = request.form.get('event_location', 'Great Wall of China')
+            event_logo = '🎉'
             
             status = 'Pending Approval' if current_role == 'admin' else 'Approved'
             
@@ -283,7 +312,7 @@ def manage_data():
             flash("Event created successfully!", "success")
             return redirect(url_for('manage_data'))
             
-        # B. FITUR CREATE INVITATION
+        # B. FITUR CREATE INVITATION (Tambahkan status is_active: True saat generate)
         elif form_type == 'create_invitation':
             if current_role not in ['superadmin', 'admin']:
                 flash("Unauthorized.", "danger")
@@ -301,10 +330,11 @@ def manage_data():
             if selected_event:
                 invitations_collection.insert_one({
                     "event_id": ObjectId(event_id),
-                    "title": selected_event['event_name'],
+                    "event_name": selected_event['event_name'],
                     "date": selected_event['event_date'],
                     "guest_name": guest_name,
                     "status": "Active",
+                    "is_active": True, # FITUR BARU: Default aktif saat dibuat
                     "created_by": username
                 })
                 flash("Invitation generated successfully!", "success")
@@ -350,7 +380,7 @@ def manage_data():
             events_collection.update_one({"_id": ObjectId(event_id)}, {"$set": update_data})
             invitations_collection.update_many(
                 {"event_id": ObjectId(event_id)},
-                {"$set": {"title": new_name, "date": new_date}}
+                {"$set": {"event_name": new_name, "date": new_date}}
             )
             flash("Event updated successfully!", "success")
             return redirect(url_for('manage_data'))
@@ -358,11 +388,15 @@ def manage_data():
         # D. FITUR EDIT INVITATION
         elif form_type == 'edit_invitation':
             invite_id = request.form.get('invite_id')
+            # Ambil nilai status link dari form (jika dicentang berarti True, jika tidak berarti False)
+            link_status = True if request.form.get('is_active') else False
+            
             invitations_collection.update_one(
                 {"_id": ObjectId(invite_id)},
                 {"$set": {
                     "guest_name": request.form.get('guest_name'),
-                    "status": request.form.get('status')
+                    "status": request.form.get('status'),
+                    "is_active": link_status # FITUR BARU: Update status keaktifan link
                 }}
             )
             flash("Invitation record updated successfully!", "success")
@@ -374,40 +408,28 @@ def manage_data():
     # Menampilkan semua event untuk superadmin maupun admin
     if current_role in ['superadmin', 'admin']:
         all_events = list(events_collection.find())
-    else:
-        all_events = list(events_collection.find({"created_by": username}))
-    
-    # Menampilkan pilihan event yang sudah disetujui di dropdown Generate Invitation
-    if current_role in ['superadmin', 'admin']:
         dropdown_events = list(events_collection.find({"status": "Approved"}))
-    else:
-        dropdown_events = []
-    
-    # Menampilkan semua undangan yang sudah digenerate untuk admin & superadmin
-    if current_role in ['superadmin', 'admin']:
         invitations = list(invitations_collection.find())
     else:
+        all_events = list(events_collection.find({"created_by": username}))
+        dropdown_events = []
         admin_event_ids = [ev['_id'] for ev in all_events]
-        invitations = list(invitations_collection.find({
-            "event_id": {"$in": admin_event_ids}
-        }))
+        invitations = list(invitations_collection.find({"event_id": {"$in": admin_event_ids}}))
 
-    # Tambahkan kode penentuan status visual tanpa merusak status asli database
     for invite in invitations:
         rsvp_data = rsvps_collection.find_one({"invitation_id": invite['_id']})
-        
-        # Ambil status rsvp jika ada
         rsvp_status = rsvp_data.get('attendance') if rsvp_data else None
         
-        # Jika rsvp sudah diisi Akan Hadir/Tidak akan hadir, display_status mengikuti RSVP
         if rsvp_status in ['Akan Hadir', 'Tidak akan hadir']:
             invite['display_status'] = rsvp_status
         elif invite.get('status') == 'Pending Deletion':
             invite['display_status'] = 'Pending Deletion'
+        # Tambahan indikator visual jika link dinonaktifkan
+        elif not invite.get('is_active', True):
+            invite['display_status'] = 'Pasif / Nonaktif'
         else:
             invite['display_status'] = 'Active'
         
-        # Simpan data RSVP asli ke objek invite
         if rsvp_data:
             invite['rsvp'] = rsvp_status
             invite['total_guests'] = rsvp_data.get('total_guests', 1)
@@ -416,14 +438,8 @@ def manage_data():
             invite['rsvp'] = None
             invite['total_guests'] = 0
             invite['wishes'] = None
-    
-    return render_template(
-        'manage_data.html', 
-        events=all_events, 
-        approved_events=dropdown_events, 
-        invitations=invitations, 
-        role=current_role
-    )
+            
+    return render_template('manage_data.html', events=all_events, approved_events=dropdown_events, invitations=invitations, role=current_role)
 
 # ==========================================
 # --- Superadmin Routs ---
@@ -571,56 +587,47 @@ def cancel_delete_request(id):
 
 @app.route('/usher/guestbook', methods=['GET'])
 @login_required
-@roles_required('superadmin', 'admin', 'usher')
+@roles_required('superadmin', 'usher')
 def usher_guestbook():
+    settings = get_global_settings()
+    # Jika ditutup, hanya role superadmin yang tetap bisa akses
+    if not settings.get('allow_guestbook', True) and session['user']['role'] != 'superadmin':
+        flash("Halaman Buku Tamu saat ini sedang ditutup oleh Superadmin.", "danger")
+        return redirect(url_for('dashboard'))
+
     current_role = session['user']['role']
     current_user_id = session['user']['id']
-    
-    # Mengambil event_id yang dipilih dari dropdown di front-end (jika ada)
     selected_event_id = request.args.get('event_id')
     
     allowed_events = []
     has_permission = True
 
     if current_role == 'usher':
-        # Ambil data khusus usher untuk melihat daftar acara yang diizinkan
         usher_data = users_collection.find_one({"_id": ObjectId(current_user_id)})
         allowed_event_ids = usher_data.get('allowed_events', [])
-        
         if not allowed_event_ids:
             has_permission = False
         else:
-            # Ambil detail informasi acara (nama acara) untuk dropdown
             allowed_events = list(events_collection.find({"_id": {"$in": allowed_event_ids}}))
-            
-            # Jika belum memilih acara, otomatis pilih acara pertama dari daftar izin
             if not selected_event_id:
                 selected_event_id = str(allowed_event_ids[0])
     else:
-        # Superadmin dan Admin bisa melihat semua event yang 'Approved'
         allowed_events = list(events_collection.find({"status": "Approved"}))
         if allowed_events and not selected_event_id:
             selected_event_id = str(allowed_events[0]['_id'])
 
-    # Mengambil data tamu yang sudah check-in berdasarkan acara yang dipilih
     attended_guests = []
     if has_permission and selected_event_id:
         attended_guests = list(rsvps_collection.find({
-            "attendance": "Akan Hadir",
+            "attendance": "Hadir", # <--- UBAH JUGA DI SINI SUPAYA DAFTAR TAMU "Hadir" BISA MUNCUL
             "event_id": ObjectId(selected_event_id)
         }).sort("submitted_at", -1))
         
-    return render_template(
-        'usher_guestbook.html', 
-        attended_guests=attended_guests,
-        allowed_events=allowed_events,
-        selected_event_id=selected_event_id,
-        has_permission=has_permission
-    )
+    return render_template('usher_guestbook.html', attended_guests=attended_guests, allowed_events=allowed_events, selected_event_id=selected_event_id, has_permission=has_permission)
 
 @app.route('/usher/check-in/<id>', methods=['POST'])
 @login_required
-@roles_required('superadmin', 'admin', 'usher')
+@roles_required('superadmin', 'usher')
 def usher_check_in(id):
     try:
         try:
@@ -653,7 +660,7 @@ def usher_check_in(id):
                     "invitation_id": invitation_oid,
                     "event_id": event_oid,
                     "guest_name": guest_name,
-                    "attendance": "Akan Hadir",
+                    "attendance": "Hadir",
                     "total_guests": 1,
                     "submitted_at": datetime.datetime.now()
                 }
@@ -671,58 +678,140 @@ def usher_check_in(id):
 
 @app.route('/superadmin/manage-people', methods=['GET', 'POST'])
 @login_required
-@roles_required('superadmin')
 def manage_people():
-    settings = get_global_settings()
-    
+    if session['user']['role'] != 'superadmin':
+        flash("Akses ditolak! Halaman ini hanya untuk Superadmin.", "danger")
+        return redirect(url_for('dashboard'))
+
+    settings = db.settings.find_one({"type": "global_config"}) or get_global_settings()
+
     if request.method == 'POST':
         form_type = request.form.get('form_type')
         
-        # Fitur Buka/Tutup Login & Register
-        if form_type == 'toggle_gate':
-            allow_reg = True if request.form.get('allow_registration') == 'on' else False
-            allow_log = True if request.form.get('allow_login') == 'on' else False
+        # -------------------------------------------------------------
+        # FORM BARU: TAMBAH PENGGUNA BARU (REGISTER OLEH SUPERADMIN)
+        # -------------------------------------------------------------
+        if form_type == 'add_user':
+            username = request.form.get('username')
+            email = request.form.get('email')
+            password = request.form.get('password')
+            role = request.form.get('role', 'user')
+            # allowed_events dihapus dari sini
+
+            if not username or not email or not password or not role:
+                flash("Semua data wajib diisi!", "danger")
+                return redirect(url_for('manage_people'))
+
+            if users_collection.find_one({"email": email}):
+                flash("Email sudah terdaftar!", "danger")
+                return redirect(url_for('manage_people'))
+
+            hashed_password = generate_password_hash(password)
+            users_collection.insert_one({
+                "username": username,
+                "email": email,
+                "password": hashed_password,
+                "role": role
+            })
+            flash(f"Pengguna baru '{username}' berhasil didaftarkan!", "success")
+            return redirect(url_for('manage_people'))
+
+        # -------------------------------------------------------------
+        # FORM 1: TOGGLE GERBANG AKSES (REGISTRASI / LOGIN)
+        # -------------------------------------------------------------
+        elif form_type == 'toggle_gate':
+            allow_reg = True if request.form.get('allow_registration') else False
+            allow_login = True if request.form.get('allow_login') else False
+            allow_dash = True if request.form.get('allow_dashboard') else False
+            allow_manage = True if request.form.get('allow_manage_data') else False
+            allow_gbook = True if request.form.get('allow_guestbook') else False
+            allow_prof = True if request.form.get('allow_profile') else False # Ambil value checkbox profile
             
-            settings_collection.update_one(
-                {"type": "global_config"},
-                {"$set": {"allow_registration": allow_reg, "allow_login": allow_log}},
+            db.settings.update_one(
+                {"type": "global_config"}, 
+                {"$set": {
+                    "allow_registration": allow_reg, 
+                    "allow_login": allow_login,
+                    "allow_dashboard": allow_dash,
+                    "allow_manage_data": allow_manage,
+                    "allow_guestbook": allow_gbook,
+                    "allow_profile": allow_prof # Simpan konfigurasi baru ke DB
+                }}, 
                 upsert=True
             )
             flash("Pengaturan akses halaman berhasil diperbarui!", "success")
-            
-        # Fitur Berikan Izin Event ke Usher
-        elif form_type == 'assign_usher_events':
-            usher_id = request.form.get('usher_id')
-            selected_events = request.form.getlist('allowed_events') # mengambil list ID event dari checkbox
-            
-            # Konversi string IDs menjadi ObjectIds
-            event_oids = [ObjectId(eid) for eid in selected_events]
-            
-            users_collection.update_one(
-                {"_id": ObjectId(usher_id), "role": "usher"},
-                {"$set": {"allowed_events": event_oids}}
-            )
-            flash("Izin akses acara untuk Usher berhasil diperbarui!", "success")
-            
-        return redirect(url_for('manage_people'))
+            return redirect(url_for('manage_people'))
 
-    # Ambil data untuk ditampilkan di halaman (Kecuali akun superadmin itu sendiri)
-    all_users = list(users_collection.find({"_id": {"$ne": ObjectId(session['user']['id'])}}))
-    approved_events = list(events_collection.find({"status": "Approved"}))
-    
+        # -------------------------------------------------------------
+        # FORM 2: EDIT USER TERPADU (PROFIL, PASSWORD & IZIN ACARA)
+        # -------------------------------------------------------------
+        elif form_type == 'edit_user_unified':
+            user_id = request.form.get('user_id')
+            role = request.form.get('role')
+            password_baru = request.form.get('password')
+            allowed_events = request.form.getlist('allowed_events')
+
+            # Validasi diubah karena username dan email sudah tidak dikirim
+            if not user_id or not role:
+                flash("Data wajib diisi!", "danger")
+                return redirect(url_for('manage_people'))
+
+            target_user = users_collection.find_one({"_id": ObjectId(user_id)})
+            if not target_user:
+                flash("Pengguna tidak ditemukan!", "danger")
+                return redirect(url_for('manage_people'))
+
+            # Proteksi agar role superadmin tidak berubah tidak sengaja
+            if target_user.get('role') == 'superadmin':
+                role = 'superadmin'
+
+            # Update_data sekarang tidak menyertakan username dan email
+            update_data = {
+                "role": role,
+                "allowed_events": allowed_events
+            }
+
+            if password_baru and password_baru.strip() != "":
+                update_data["password"] = generate_password_hash(password_baru)
+
+            users_collection.update_one(
+                {"_id": ObjectId(user_id)},
+                {"$set": update_data}
+            )
+
+            # Menggunakan target_user['username'] untuk flash message karena input username sudah dihapus
+            flash(f"Data pengguna '{target_user.get('username')}' berhasil diperbarui!", "success")
+            return redirect(url_for('manage_people'))
+
+    # --- HANDLING GET REQUEST ---
+    all_users = list(users_collection.find())
+    all_events = list(events_collection.find())
+
     return render_template(
         'manage_people.html', 
         users=all_users, 
-        events=approved_events, 
-        settings=settings
+        events=all_events, 
+        settings=settings,
+        role=session['user']['role']
     )
 
-@app.route('/superadmin/delete-user/<id>')
+@app.route('/superadmin/delete-user/<user_id>')
 @login_required
-@roles_required('superadmin')
-def delete_user(id):
-    users_collection.delete_one({"_id": ObjectId(id)})
-    flash("Pengguna berhasil dihapus dari sistem permanently.", "success")
+def delete_user(user_id):
+    if session['user']['role'] != 'superadmin':
+        flash("Akses ditolak!", "danger")
+        return redirect(url_for('dashboard'))
+        
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if user:
+        if user['role'] == 'superadmin':
+            flash("Tidak dapat menghapus sesama akun Superadmin!", "danger")
+        else:
+            users_collection.delete_one({"_id": ObjectId(user_id)})
+            flash(f"Pengguna '{user['username']}' berhasil dihapus permanen.", "success")
+    else:
+        flash("Pengguna tidak ditemukan.", "danger")
+        
     return redirect(url_for('manage_people'))
 
 # ==========================================
@@ -732,6 +821,13 @@ def delete_user(id):
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
+    settings = get_global_settings()
+    
+    # JIKA AKSES PROFILE DITUTUP: Hanya superadmin yang tetap bisa tembus masuk
+    if not settings.get('allow_profile', True) and session['user']['role'] != 'superadmin':
+        flash("Halaman Pengaturan Profil saat ini sedang ditutup oleh Superadmin.", "danger")
+        return redirect(url_for('dashboard')) # Dialihkan kembali ke dashboard terproteksi
+
     current_user_id = session['user']['id']
     
     if request.method == 'POST':
@@ -769,9 +865,8 @@ def profile():
         return redirect(url_for('profile'))
         
     # Ambil data terbaru pengguna dari database untuk ditampilkan di form
-    user_data = users_collection.find_one({"_id": ObjectId(current_user_id)})
+    user_data = users_collection.find_one({"_id": ObjectId(session['user']['id'])})
     return render_template('profile.html', user=user_data)
-
 
 @app.route('/profile/delete-account', methods=['POST'])
 @login_required

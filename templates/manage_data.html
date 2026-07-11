@@ -138,7 +138,7 @@
       <table class="table table-striped align-middle small">
         <thead class="table-dark">
           <tr>
-            <th>Event Title</th>
+            <th>Event Name</th>
             <th>Guest Name</th>
             <th>Status</th>
             <th>Link</th>
@@ -148,7 +148,7 @@
         <tbody>
           {% for invite in invitations %}
           <tr>
-            <td>{{ invite.title }}</td>
+            <td><strong>{{ invite.event_name }}</strong></td>
             <td><strong>{{ invite.guest_name }}</strong></td>
             <td>
               {% if invite.display_status == 'Akan Hadir' %}
@@ -233,7 +233,7 @@
           <tr>
             <td class="fw-bold text-secondary pt-3">Google Calendar:</td>
             <td class="pt-3">
-              <a href="{{ cal_link }}" target="_blank" class="text-primary text-decoration-none fw-semibold">add to google calendar</a>
+              <a href="{{ cal_link }}" target="_blank" class="text-primary text-decoration-none fw-semibold">Add to Google Calendar</a>
             </td>
           </tr>
         </table>
@@ -334,20 +334,9 @@
               <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={{ request.url_root }}invitation/{{ invite._id }}" alt="QR Code" class="img-thumbnail" style="width: 110px;">
             </td>
           </tr>
-          <tr>
-            <td class="fw-bold text-secondary">RSVP Status:</td>
-            <td>
-              {% if invite.rsvp == 'Akan Hadir' %}
-                <span class="badge bg-success">Akan Hadir</span>
-              {% elif invite.rsvp == 'Tidak akan hadir' %}
-                <span class="badge bg-danger">Tidak akan hadir</span>
-              {% else %}
-                <span class="badge bg-secondary">⏳ Belum Konfirmasi</span>
-              {% endif %}
-            </td>
-          </tr>
+          <!-- 🗑️ Baris RSVP Status telah dihapus dari sini -->
           <tr><td class="fw-bold text-secondary">Jumlah Orang:</td><td>{{ invite.total_guests if invite.total_guests else 0 }} Orang</td></tr>
-          <tr><td class="fw-bold text-secondary">Wishes Received:</td><td>{{ invite.wishes if invite.wishes else 'Belum ada ucapan doa dari tamu ini.' }}</td></tr>
+          <tr><td class="fw-bold text-secondary">Wishes Received:</td><td>{{ invite.wishes if invite.wishes else '-' }}</td></tr>
         </table>
       </div>
     </div>
@@ -369,9 +358,23 @@
             <label class="form-label small fw-bold">Guest Name</label>
             <input type="text" name="guest_name" class="form-control" value="{{ invite.guest_name }}" required>
           </div>
+          
+          <!-- FITUR BARU: Switch Status Link Aktif/Pasif -->
+          <div class="mb-3 p-2 bg-light rounded border">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="is_active" id="linkActive{{ invite._id }}" {% if invite.get('is_active', True) %}checked{% endif %}>
+              <label class="form-check-label small fw-bold text-dark" for="linkActive{{ invite._id }}">
+                Tautan Link Aktif
+              </label>
+            </div>
+            <div class="form-text text-muted small" style="font-size: 0.75rem;">
+              Jika dimatikan, tamu tidak akan bisa membuka isi halaman undangan digital ini (Link Pasif).
+            </div>
+          </div>
+
           {% if invite.rsvp not in ['Akan Hadir', 'Tidak akan hadir'] %}
           <div class="mb-3">
-            <label class="form-label small fw-bold">Status</label>
+            <label class="form-label small fw-bold">Status Record</label>
             <select name="status" class="form-select">
               <option value="Active" {% if invite.status == 'Active' %}selected{% endif %}>Active</option>
               <option value="Pending Deletion" {% if invite.status == 'Pending Deletion' %}selected{% endif %}>Pending Deletion</option>
