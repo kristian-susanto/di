@@ -1,120 +1,139 @@
-{% extends 'base.html' %} 
+{% extends 'base.html' %}
 {% block content %}
-<div class="container my-4">
-  <div class="row g-4">
-    
-    <!-- KOLOM KIRI: SCANNER QR CODE -->
-    <div class="col-md-5">
-      <div class="card p-4 shadow-sm border-0 bg-white">
-        <h4 class="fw-bold text-dark text-center mb-3">QR Code Scanner Usher</h4>
-        <p class="text-muted small text-center">Arahkan kamera ke QR Code undangan digital milik tamu.</p>
-        
-        <!-- Wadah Kamera Scanner -->
-        <div id="reader" class="rounded border bg-light overflow-hidden" style="width: 100%; min-height: 300px;"></div>
-        
-        <div id="scanResult" class="mt-3 text-center d-none">
-          <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
-          <p class="small text-muted mt-1">Sedang memproses verifikasi kehadiran...</p>
+
+<div class="container my-2">
+
+    <!-- JIKA USHER TIDAK MEMILIKI IZIN APAPUN -->
+    {% if not has_permission %}
+    <div class="row justify-content-center my-5">
+        <div class="col-md-6 text-center">
+            <div class="card shadow border-0 p-4 bg-white">
+                <div class="text-danger mb-3" style="font-size: 3rem;">⚠️</div>
+                <h4 class="fw-bold text-dark">Akses Ditolak</h4>
+                <p class="text-muted">Anda belum memiliki izin untuk memakai buku tamu. Silakan hubungi Superadmin untuk memberikan akses acara kepada Anda.</p>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-sm mt-2">Kembali ke Dashboard</a>
+            </div>
         </div>
+    </div>
+    {% else %}
+
+    <!-- JIKA PUNYA IZIN: TAMPILKAN SELEKSI ACARA DI ATAS TENGAH -->
+    <div class="row justify-content-center mb-4">
+      <div class="col-md-6 text-center">
+          <div class="p-3 bg-white rounded shadow-sm border">
+              <label for="eventSelector" class="form-label fw-bold text-primary mb-2">📋 Silakan Pilih Acara yang Bertugas:</label>
+              <select id="eventSelector" class="form-select text-center fw-semibold" onchange="switchEvent(this.value)">
+                  {% for ev in allowed_events %}
+                  <option value="{{ ev._id }}" {% if ev._id | string == selected_event_id | string %}selected{% endif %}>
+                      {{ ev.event_name }}
+                  </option>
+                  {% endfor %}
+              </select>
+          </div>
       </div>
     </div>
 
-    <!-- KOLOM KANAN: LIVE BUKU TAMU (YANG SUDAH HADIR) -->
-    <div class="col-md-7">
-      <div class="card p-4 shadow-sm border-0 bg-white">
-        <h4 class="fw-bold text-secondary mb-3">Buku Tamu Hari H (Hadir)</h4>
-        <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
-          <table class="table table-striped align-middle small" id="guestTable">
-            <thead class="table-dark">
-              <tr>
-                <th>Nama Tamu</th>
-                <th>Waktu Masuk</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for guest in attended_guests %}
-              <tr>
-                <td><strong>{{ guest.guest_name }}</strong></td>
-                <td>{{ guest.submitted_at.strftime('%H:%M:%S') if guest.submitted_at else '-' }}</td>
-                <td><span class="badge bg-success">✓ Hadir</span></td>
-              </tr>
-              {% else %}
-              <tr id="emptyRow">
-                <td colspan="3" class="text-center text-muted py-3">Belum ada tamu yang dicatat hadir melalui scan.</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+    <!-- TAMPILAN UTAMA SCANNER & DAFTAR HADIR -->
+    <div class="row g-4">
+        <!-- Bagian Kiri: Scanner -->
+        <div class="col-md-5">
+            <div class="card shadow-sm border-0 h-100 bg-white">
+                <div class="card-body text-center p-4">
+                    <h4 class="fw-bold text-dark mb-1">QR Code Scanner Usher</h4>
+                    <p class="text-muted small mb-4">Arahkan kamera ke QR Code undangan digital milik tamu.</p>
+                    
+                    <!-- Wadah scan HTML5-QRCODE -->
+                    <div id="reader" class="mx-auto rounded border bg-light" style="width: 100%; max-width: 380px;"></div>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
 
-  </div>
+        <!-- Bagian Kanan: Buku Tamu Hari H -->
+        <div class="col-md-7">
+            <div class="card shadow-sm border-0 h-100 bg-white">
+                <div class="card-header bg-primary text-white fw-bold py-3">
+                    Buku Tamu Hari H (Hadir)
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover mb-0 align-middle">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th class="px-3">Nama Tamu</th>
+                                    <th>Waktu Masuk</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="guestTableBody">
+                                {% if attended_guests %}
+                                    {% for guest in attended_guests %}
+                                    <tr>
+                                        <td class="px-3 fw-semibold">{{ guest.guest_name }}</td>
+                                        <td>{{ guest.submitted_at.strftime('%H:%M:%S') if guest.submitted_at else '-' }}</td>
+                                        <td class="text-center"><span class="badge bg-success">Hadir</span></td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="3" class="text-center py-4 text-muted small">Belum ada tamu yang dicatat hadir melalui scan untuk acara ini.</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
-<!-- Sertakan Html5-Qrcode Scanner Library & SweetAlert2 -->
+<!-- SCRIPT UNTUK MENU SWITCH DAN HANDLING QR SCANNER -->
 <script src="https://unpkg.com/html5-qrcode"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
 <script>
-  // Logika Scanner QR Code
-  function onScanSuccess(decodedText, decodedResult) {
-    // QR Code bawaan Anda menghasilkan URL penuh: http://127.0.0.1:5000/invitation/<id>
-    // Kita ekstrak ID Undangan yang berada di bagian paling akhir URL
-    const urlParts = decodedText.split('/');
-    const inviteId = urlParts[urlParts.length - 1];
-
-    if (!inviteId || inviteId.trim() === "") {
-        Swal.fire({ icon: 'error', title: 'Gagal', text: 'QR Code tidak valid!' });
-        return;
+    // Fungsi untuk memuat ulang halaman berdasarkan acara yang dipilih dari dropdown
+    function switchEvent(eventId) {
+        window.location.href = "{{ url_for('usher_guestbook') }}?event_id=" + eventId;
     }
 
-    // Hentikan scanner sementara waktu agar tidak menduplikasi request scan berkali-kali
-    html5QrcodeScanner.clear();
-    document.getElementById('scanResult').classList.remove('d-none');
+    // Inisialisasi QR Code Scanner jika elemen reader tersedia (punya izin)
+    document.addEventListener("DOMContentLoaded", function () {
+        const readerElement = document.getElementById('reader');
+        if (!readerElement) return;
 
-    // Kirim AJAX POST Ke Route Check-In Usher
-    fetch(`/usher/check-in/${inviteId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    })
-    .then(res => res.json())
-    .then(data => {
-      document.getElementById('scanResult').classList.add('d-none');
+        const html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader", { fps: 10, qrbox: 250 }, /* verbose= */ false
+        );
 
-      if (data.status === 'success') {
-        Swal.fire({
-          icon: 'success',
-          title: 'Presensi Berhasil',
-          text: data.message,
-          timer: 3000,
-          showConfirmButton: true
-        }).then(() => {
-          // Refresh halaman untuk memperbarui daftar tabel kehadiran live buku tamu
-          window.location.reload();
-        });
-      } else {
-        Swal.fire({
-          icon: 'error',
-          title: 'Gagal',
-          text: data.message
-        }).then(() => { restartScanner(); });
-      }
-    })
-    .catch(() => {
-      document.getElementById('scanResult').classList.add('d-none');
-      Swal.fire({ icon: 'error', title: 'Error', text: 'Koneksi ke server gagal.' });
-      restartScanner();
+        function onScanSuccess(decodedText, decodedResult) {
+            // Hentikan scan sementara saat memproses data untuk menghindari double entry
+            html5QrcodeScanner.clear();
+
+            // Kirim request Check-In ke Backend menggunakan fetch API
+            fetch(`/usher/check-in/${decodedText}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert(data.message);
+                } else {
+                    alert("Gagal: " + data.message);
+                }
+                // Muat ulang halaman agar tabel ter-update secara realtime
+                window.location.reload();
+            })
+            .catch(err => {
+                alert("Terjadi kesalahan jaringan atau server.");
+                window.location.reload();
+            });
+        }
+
+        html5QrcodeScanner.render(onScanSuccess);
     });
-  }
-
-  function restartScanner() {
-    html5QrcodeScanner.render(onScanSuccess);
-  }
-
-  // Inisialisasi awal Scanner saat halaman dimuat
-  const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
-  html5QrcodeScanner.render(onScanSuccess);
 </script>
+
 {% endblock %}

@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<div class="row justify-content-center my-4">
+    <div class="col-md-6 col-sm-10">
+        <div class="card shadow-sm border-0 rounded-3 p-4 bg-white mb-4">
+            <div class="text-center mb-4">
+                <h3 class="fw-bold text-dark">⚙️ Pengaturan Profil</h3>
+                <p class="text-muted small">Perbarui data informasi akun Anda secara berkala</p>
+            </div>
+
+            <form action="{{ url_for('profile') }}" method="POST">
+                <div class="mb-3">
+                    <label for="username" class="form-label fw-semibold text-secondary">Username</label>
+                    <input type="text" name="username" id="username" class="form-control" value="{{ user.username }}" required />
+                </div>
+
+                <div class="mb-3">
+                    <label for="email" class="form-label fw-semibold text-secondary">Email Address</label>
+                    <input type="email" name="email" id="email" class="form-control" value="{{ user.email }}" required />
+                </div>
+
+                <div class="mb-4">
+                    <label for="password" class="form-label fw-semibold text-secondary">Password Baru <small class="text-muted">(Kosongkan jika tidak ingin diubah)</small></label>
+                    <input type="password" name="password" id="password" class="form-control" placeholder="••••••••" />
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 py-2">
+                    Simpan Perubahan
+                </button>
+            </form>
+        </div>
+
+        <div class="card shadow-sm border-1 border-danger rounded-3 p-4 bg-white">
+            <h5 class="fw-bold text-danger mb-2">🔴 Zona Bahaya</h5>
+            <p class="text-muted small mb-3">Setelah Anda menghapus akun, semua data yang berkaitan dengan akun ini akan hilang secara permanen dan tidak dapat dikembalikan.</p>
+            <button type="button" id="btnDeleteAccount" class="btn btn-outline-danger w-100 py-2 fw-semibold">
+                Hapus Akun Saya
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('btnDeleteAccount').addEventListener('click', function() {
+        Swal.fire({
+            title: 'Apakah Anda yakin?',
+            text: "Akun Anda akan dihapus secara permanen dan Anda akan otomatis keluar dari sistem!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Ya, Hapus Akun!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Tampilkan loading spinner saat proses menghapus berjalan
+                Swal.fire({
+                    title: 'Memproses...',
+                    text: 'Sedang menghapus akun Anda dari database.',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                // Kirim request ke backend untuk menghapus data menggunakan Fetch API
+                fetch("{{ url_for('delete_account') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Berhasil Dihapus!',
+                            text: data.message,
+                            confirmButtonText: 'OK'
+                        }).then(() => {
+                            // Arahkan kembali ke halaman login setelah berhasil dihapus
+                            window.location.href = "{{ url_for('login') }}";
+                        });
+                    } else {
+                        Swal.fire('Gagal!', 'Terjadi kendala saat menghapus akun.', 'error');
+                    }
+                })
+                .catch(err => {
+                    Swal.fire('Error!', 'Tidak dapat terhubung ke server.', 'error');
+                });
+            }
+        });
+    });
+</script>
+
+{% endblock %}
