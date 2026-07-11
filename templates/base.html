@@ -30,11 +30,14 @@
                 >Dashboard</a
               >
             </li>
+            <!-- Cari bagian navbar di base.html dan sesuaikan kondisinya -->
             {% if session['user']['role'] in ['superadmin', 'admin', 'usher'] %}
             <li class="nav-item">
-              <a class="nav-link" href="{{ url_for('manage_data') }}"
-                >Manage Data</a
-              >
+              <a class="nav-link" href="{{ url_for('manage_data') }}">Manage Data</a>
+            </li>
+            <!-- Link tambahan untuk Buku Tamu Usher -->
+            <li class="nav-item">
+              <a class="nav-link text-info fw-bold" href="/usher/guestbook">📋 Buku Tamu Hari H</a>
             </li>
             {% endif %}
             <li class="nav-item">

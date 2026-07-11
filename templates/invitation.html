@@ -386,8 +386,8 @@
                 <label class="form-label small fw-bold">Konfirmasi</label>
                 <select name="attendance" class="form-select" required>
                   <option value="" disabled {% if not current_rsvp %}selected{% endif %}>Apakah Anda akan hadir?</option>
-                  <option value="Hadir" {% if current_rsvp and current_rsvp.attendance == 'Hadir' %}selected{% endif %}>✅ Ya, Saya Akan Hadir</option>
-                  <option value="Tidak Hadir" {% if current_rsvp and current_rsvp.attendance == 'Tidak Hadir' %}selected{% endif %}>❌ Maaf, Saya Berhalangan Hadir</option>
+                  <option value="Akan Hadir" {% if current_rsvp and current_rsvp.attendance == 'Akan Hadir' %}selected{% endif %}>✅ Ya, Saya Akan Hadir</option>
+                  <option value="Tidak akan hadir" {% if current_rsvp and current_rsvp.attendance == 'Tidak akan hadir' %}selected{% endif %}>❌ Maaf, Saya Berhalangan Hadir</option>
                 </select>
               </div>
 

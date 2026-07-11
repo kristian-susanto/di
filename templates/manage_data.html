@@ -151,10 +151,10 @@
             <td>{{ invite.title }}</td>
             <td><strong>{{ invite.guest_name }}</strong></td>
             <td>
-              {% if invite.display_status == 'Hadir' %}
-              <span class="badge bg-success">Hadir</span>
-              {% elif invite.display_status == 'Tidak Hadir' %}
-              <span class="badge bg-danger">Tidak Hadir</span>
+              {% if invite.display_status == 'Akan Hadir' %}
+              <span class="badge bg-success">Akan Hadir</span>
+              {% elif invite.display_status == 'Tidak akan hadir' %}
+              <span class="badge bg-danger">Tidak akan hadir</span>
               {% elif invite.status == 'Pending Deletion' %}
               <span class="badge bg-warning text-dark">Pending Deletion</span>
               {% else %}
@@ -317,10 +317,10 @@
         <table class="table table-sm table-borderless">
           <tr><td class="fw-bold text-secondary w-25">Guest Name:</td><td>{{ invite.guest_name }}</td></tr>
           <tr><td class="fw-bold text-secondary">Status:</td><td>
-            {% if invite.display_status == 'Hadir' %}
-              Hadir
-            {% elif invite.display_status == 'Tidak Hadir' %}
-              Tidak Hadir
+            {% if invite.display_status == 'Akan Hadir' %}
+              Akan Hadir
+            {% elif invite.display_status == 'Tidak akan hadir' %}
+              Tidak akan hadir
             {% elif invite.status == 'Pending Deletion' %}
               Pending Deletion
             {% else %}
@@ -337,10 +337,10 @@
           <tr>
             <td class="fw-bold text-secondary">RSVP Status:</td>
             <td>
-              {% if invite.rsvp == 'Hadir' %}
-                <span class="badge bg-success">Hadir</span>
-              {% elif invite.rsvp == 'Tidak Hadir' %}
-                <span class="badge bg-danger">Tidak Hadir</span>
+              {% if invite.rsvp == 'Akan Hadir' %}
+                <span class="badge bg-success">Akan Hadir</span>
+              {% elif invite.rsvp == 'Tidak akan hadir' %}
+                <span class="badge bg-danger">Tidak akan hadir</span>
               {% else %}
                 <span class="badge bg-secondary">⏳ Belum Konfirmasi</span>
               {% endif %}
@@ -369,7 +369,7 @@
             <label class="form-label small fw-bold">Guest Name</label>
             <input type="text" name="guest_name" class="form-control" value="{{ invite.guest_name }}" required>
           </div>
-          {% if invite.rsvp not in ['Hadir', 'Tidak Hadir'] %}
+          {% if invite.rsvp not in ['Akan Hadir', 'Tidak akan hadir'] %}
           <div class="mb-3">
             <label class="form-label small fw-bold">Status</label>
             <select name="status" class="form-select">

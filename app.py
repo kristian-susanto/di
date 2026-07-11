@@ -370,8 +370,8 @@ def manage_data():
         # Ambil status rsvp jika ada
         rsvp_status = rsvp_data.get('attendance') if rsvp_data else None
         
-        # Jika rsvp sudah diisi Hadir/Tidak Hadir, display_status mengikuti RSVP
-        if rsvp_status in ['Hadir', 'Tidak Hadir']:
+        # Jika rsvp sudah diisi Akan Hadir/Tidak akan hadir, display_status mengikuti RSVP
+        if rsvp_status in ['Akan Hadir', 'Tidak akan hadir']:
             invite['display_status'] = rsvp_status
         elif invite.get('status') == 'Pending Deletion':
             invite['display_status'] = 'Pending Deletion'
@@ -537,6 +537,61 @@ def cancel_delete_request(id):
     )
     flash("Permintaan hapus undangan berhasil dibatalkan.", "success")
     return redirect(url_for('manage_data'))
+
+# --- ROUTE TAMBAHAN UNTUK BUKU TAMU USHER ---
+
+@app.route('/usher/guestbook', methods=['GET'])
+@login_required
+@roles_required('superadmin', 'admin', 'usher')
+def usher_guestbook():
+    # Mengambil daftar tamu yang sudah sukses dicatat hadir pada hari H
+    attended_guests = list(rsvps_collection.find({"attendance": "Akan Hadir"}).sort("submitted_at", -1))
+    return render_template('usher_guestbook.html', attended_guests=attended_guests)
+
+# Tambahkan route ini di dalam app.py Anda
+
+@app.route('/usher/check-in/<id>', methods=['POST'])
+@login_required
+@roles_required('superadmin', 'admin', 'usher')
+def usher_check_in(id):
+    try:
+        # PENTING: Ubah string ID dari QR Code menjadi ObjectId MongoDB
+        try:
+            invitation_oid = ObjectId(id)
+        except Exception:
+            return jsonify({"status": "error", "message": "Format ID Undangan tidak valid."}), 400
+
+        # Cari data undangan berdasarkan id tersebut
+        invitation = invitations_collection.find_one({"_id": invitation_oid})
+        if not invitation:
+            return jsonify({"status": "error", "message": "Undangan tidak ditemukan di database."}), 404
+
+        guest_name = invitation.get('guest_name')
+        event_id = invitation.get('event_id')
+
+        # Lakukan update atau masukkan ke koleksi rsvps_collection sebagai "Akan Hadir"
+        rsvps_collection.update_one(
+            {"invitation_id": invitation_oid},
+            {
+                "$set": {
+                    "invitation_id": invitation_oid,
+                    "event_id": ObjectId(event_id) if isinstance(event_id, str) else event_id,
+                    "guest_name": guest_name,
+                    "attendance": "Akan Hadir",  # Menandakan tamu statusnya HADIR di sistem Anda
+                    "total_guests": 1,
+                    "submitted_at": datetime.datetime.now()
+                }
+            },
+            upsert=True  # Jika data rsvp belum ada, otomatis buat baru
+        )
+
+        return jsonify({
+            "status": "success", 
+            "message": f"Berhasil! Kehadiran atas nama '{guest_name}' telah dicatat."
+        })
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Terjadi kesalahan sistem: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

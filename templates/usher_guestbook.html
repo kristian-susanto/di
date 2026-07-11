@@ -1,0 +1,120 @@
+{% extends 'base.html' %} 
+{% block content %}
+<div class="container my-4">
+  <div class="row g-4">
+    
+    <!-- KOLOM KIRI: SCANNER QR CODE -->
+    <div class="col-md-5">
+      <div class="card p-4 shadow-sm border-0 bg-white">
+        <h4 class="fw-bold text-dark text-center mb-3">QR Code Scanner Usher</h4>
+        <p class="text-muted small text-center">Arahkan kamera ke QR Code undangan digital milik tamu.</p>
+        
+        <!-- Wadah Kamera Scanner -->
+        <div id="reader" class="rounded border bg-light overflow-hidden" style="width: 100%; min-height: 300px;"></div>
+        
+        <div id="scanResult" class="mt-3 text-center d-none">
+          <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+          <p class="small text-muted mt-1">Sedang memproses verifikasi kehadiran...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- KOLOM KANAN: LIVE BUKU TAMU (YANG SUDAH HADIR) -->
+    <div class="col-md-7">
+      <div class="card p-4 shadow-sm border-0 bg-white">
+        <h4 class="fw-bold text-secondary mb-3">Buku Tamu Hari H (Hadir)</h4>
+        <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
+          <table class="table table-striped align-middle small" id="guestTable">
+            <thead class="table-dark">
+              <tr>
+                <th>Nama Tamu</th>
+                <th>Waktu Masuk</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for guest in attended_guests %}
+              <tr>
+                <td><strong>{{ guest.guest_name }}</strong></td>
+                <td>{{ guest.submitted_at.strftime('%H:%M:%S') if guest.submitted_at else '-' }}</td>
+                <td><span class="badge bg-success">✓ Hadir</span></td>
+              </tr>
+              {% else %}
+              <tr id="emptyRow">
+                <td colspan="3" class="text-center text-muted py-3">Belum ada tamu yang dicatat hadir melalui scan.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Sertakan Html5-Qrcode Scanner Library & SweetAlert2 -->
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+  // Logika Scanner QR Code
+  function onScanSuccess(decodedText, decodedResult) {
+    // QR Code bawaan Anda menghasilkan URL penuh: http://127.0.0.1:5000/invitation/<id>
+    // Kita ekstrak ID Undangan yang berada di bagian paling akhir URL
+    const urlParts = decodedText.split('/');
+    const inviteId = urlParts[urlParts.length - 1];
+
+    if (!inviteId || inviteId.trim() === "") {
+        Swal.fire({ icon: 'error', title: 'Gagal', text: 'QR Code tidak valid!' });
+        return;
+    }
+
+    // Hentikan scanner sementara waktu agar tidak menduplikasi request scan berkali-kali
+    html5QrcodeScanner.clear();
+    document.getElementById('scanResult').classList.remove('d-none');
+
+    // Kirim AJAX POST Ke Route Check-In Usher
+    fetch(`/usher/check-in/${inviteId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    })
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById('scanResult').classList.add('d-none');
+
+      if (data.status === 'success') {
+        Swal.fire({
+          icon: 'success',
+          title: 'Presensi Berhasil',
+          text: data.message,
+          timer: 3000,
+          showConfirmButton: true
+        }).then(() => {
+          // Refresh halaman untuk memperbarui daftar tabel kehadiran live buku tamu
+          window.location.reload();
+        });
+      } else {
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal',
+          text: data.message
+        }).then(() => { restartScanner(); });
+      }
+    })
+    .catch(() => {
+      document.getElementById('scanResult').classList.add('d-none');
+      Swal.fire({ icon: 'error', title: 'Error', text: 'Koneksi ke server gagal.' });
+      restartScanner();
+    });
+  }
+
+  function restartScanner() {
+    html5QrcodeScanner.render(onScanSuccess);
+  }
+
+  // Inisialisasi awal Scanner saat halaman dimuat
+  const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+  html5QrcodeScanner.render(onScanSuccess);
+</script>
+{% endblock %}
