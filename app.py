@@ -1,11 +1,12 @@
-import os
-from flask import Flask, render_template, render_template_string, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, render_template_string, request, redirect, url_for, session, flash, jsonify, abort
 from functools import wraps
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
+import os
 import shutil
+import secrets
 import datetime
 
 # Load environment variables
@@ -48,120 +49,6 @@ def roles_required(*roles):
         return decorated_function
     return decorator
 
-# --- ROUTES ---
-
-@app.route('/')
-def home():
-    if 'user' in session:
-        return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
-
-@app.route('/invitation/<id>', methods=['GET'])
-def view_invitation(id):
-    invite = invitations_collection.find_one({"_id": ObjectId(id)})
-    if not invite:
-        return "Undangan tidak ditemukan", 404
-        
-    settings = get_global_settings()
-    
-    if not settings.get('allow_all_invitations', True) and not invite.get('is_active', True):
-        return render_template_string('''
-            <!DOCTYPE html>
-            <html>
-            <head><title>Undangan Nonaktif</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"></head>
-            <body class="bg-light d-flex align-items-center justify-content-center" style="height: 100vh;">
-                <div class="card p-5 text-center shadow" style="max-width: 500px;">
-                    <h1 class="text-danger mb-3">⚠️ Undangan Ditutup</h1>
-                    <p class="text-muted">Maaf, akses undangan digital saat ini sedang dinonaktifkan sementara.</p>
-                </div>
-            </body>
-            </html>
-        '''), 403
-
-    event = events_collection.find_one({"_id": invite['event_id']})
-    
-    # Karena data bersatu di invitations, current_rsvp adalah data invite itu sendiri
-    current_rsvp = invite 
-    
-    # Cari ucapan (wishes) dari invitations_collection yang event_id-nya sama
-    all_wishes = list(invitations_collection.find({
-        "event_id": invite['event_id'], 
-        "wishes": {"$ne": "", "$exists": True}
-    }))
-    
-    qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={id}"
-    
-    return render_template('invitation.html', invite=invite, event=event, current_rsvp=current_rsvp, all_wishes=all_wishes, qr_code_url=qr_code_url)
-
-@app.route('/invitation/<id>/rsvp', methods=['POST'])
-def submit_rsvp(id):
-    try:
-        invitation_oid = ObjectId(id)
-        invitation = invitations_collection.find_one({"_id": invitation_oid})
-        if not invitation:
-            return {"status": "error", "message": "Invitation not found."}, 404
-
-        status = request.form.get('status')
-        total_guests = request.form.get('total_guests', 1)
-
-        # Update langsung ke dokumen invitations_collection
-        invitations_collection.update_one(
-            {"_id": invitation_oid},
-            {
-                "$set": {
-                    "status": status,
-                    "total_guests": int(total_guests) if total_guests else 1,
-                    "submitted_at": datetime.datetime.now()
-                }
-            }
-        )
-        return {"status": "success", "message": "Your attendance confirmation has been successfully saved!"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}, 500
-
-@app.route('/invitation/<id>/wishes', methods=['POST'])
-def submit_wishes(id):
-    try:
-        invitation_oid = ObjectId(id)
-        invitation = invitations_collection.find_one({"_id": invitation_oid})
-        if not invitation:
-            return {"status": "error", "message": "Invitation not found."}, 404
-            
-        wishes = request.form.get('wishes', '')
-        event_oid = ObjectId(invitation['event_id']) if isinstance(invitation['event_id'], str) else invitation['event_id']
-
-        # Update ucapan ke dalam koleksi invitations
-        invitations_collection.update_one(
-            {"_id": invitation_oid},
-            {
-                "$set": {
-                    "wishes": wishes,
-                    "submitted_at": datetime.datetime.now()
-                }
-            }
-        )
-        
-        # Ambil ulang SEMUA ucapan dari tamu yang memiliki event_id yang sama di koleksi invitations
-        all_wishes = list(invitations_collection.find({
-            "event_id": event_oid, 
-            "wishes": {"$ne": "", "$exists": True}
-        }))
-        
-        wishes_data = []
-        for w in all_wishes:
-            wishes_data.append({
-                "guest_name": w.get('guest_name', 'Tamu Undangan'),
-                "wishes": w.get('wishes', '')
-            })
-
-        return {
-            "status": "success", 
-            "message": "Terima kasih! Doa dan ucapan Anda telah diperbarui.",
-            "wishes_list": wishes_data
-        }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}, 500
-
 # Tambahkan inisialisasi koleksi baru di bagian MongoDB Connection
 settings_collection = db.settings
 
@@ -176,21 +63,30 @@ def get_global_settings():
             "allow_manage_data": True,  
             "allow_guestbook": True,
             "allow_profile": True,
-            "allow_all_invitations": True  # Default: mengizinkan semua undangan dibuka
+            "allow_all_invitations": True,
+            "allow_qrcode": True  # <-- Tambahkan Default Key Baru di Sini
         }
         settings_collection.insert_one(default)
         return default
     
-    # Memastikan key baru selalu ter-inisialisasi otomatis jika belum ada di DB
     updated = False
-    for key in ["allow_dashboard", "allow_manage_data", "allow_guestbook", "allow_profile", "allow_all_invitations"]:
+    # Masukkan "allow_qrcode" ke dalam list check inisialisasi otomatis
+    for key in ["allow_dashboard", "allow_manage_data", "allow_guestbook", "allow_profile", "allow_all_invitations", "allow_qrcode"]:
         if key not in settings:
-            settings[key] = True if key != "allow_all_invitations" else True
+            settings[key] = True
             updated = True
     if updated:
         settings_collection.update_one({"type": "global_config"}, {"$set": settings})
         
     return settings
+
+# --- ROUTES ---
+
+@app.route('/')
+def home():
+    if 'user' in session:
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('login'))
 
 # --- MODIFIKASI RUTE REGISTER ---
 @app.route('/register', methods=['GET', 'POST'])
@@ -310,15 +206,16 @@ def manage_data():
             })
             flash("Event created successfully!", "success")
             return redirect(url_for('manage_data'))
-            
+
         # Create Invitation Feature
         elif form_type == 'create_invitation':
-            if current_role not in ['superadmin', 'admin']:
+            if current_role not in ['superadmin', 'admin', 'usher']: # Tambahkan usher jika usher diperbolehkan mendaftarkan
                 flash("Unauthorized.", "danger")
                 return redirect(url_for('manage_data'))
                 
             event_id = request.form.get('event_id')
             guest_name = request.form.get('guest_name')
+            source_from = request.form.get('source_from') # Tangkap input penanda baru
             
             query = {"_id": ObjectId(event_id)}
             if current_role == 'admin':
@@ -327,18 +224,42 @@ def manage_data():
             selected_event = events_collection.find_one(query)
             
             if selected_event:
-                invitations_collection.insert_one({
+                custom_id = secrets.token_urlsafe(10)[:15]
+                
+                # Pastikan custom_id unik di database
+                while invitations_collection.find_one({"custom_id": custom_id}):
+                    custom_id = secrets.token_urlsafe(10)[:15]
+
+                # Tentukan status dan field tambahan berdasarkan asal form
+                if source_from == 'guestbook':
+                    status_value = "Attend"
+                    submitted_at_value = datetime.datetime.now()
+                else:
+                    status_value = "Active"
+                    submitted_at_value = None
+
+                insert_data = {
+                    "custom_id": custom_id,
                     "event_id": ObjectId(event_id),
                     "event_name": selected_event['event_name'],
                     "date": selected_event['event_date'],
                     "guest_name": guest_name,
-                    "status": "Active",
+                    "status": status_value,
                     "is_active": True,
                     "created_by": username
-                })
-                flash("Invitation generated successfully!", "success")
+                }
+
+                if submitted_at_value:
+                    insert_data["submitted_at"] = submitted_at_value
+
+                invitations_collection.insert_one(insert_data)
+                flash("Guest created successfully!", "success")
+                
+                # Jika berasal dari guestbook, kembalikan ke halaman guestbook beserta parameter event_id
+                if source_from == 'guestbook':
+                    return redirect(url_for('guestbook', event_id=event_id))
             else:
-                flash("Acara tidak ditemukan atau Anda tidak memiliki hak akses untuk acara ini.", "danger")
+                flash("Event not found or you do not have access rights for this event.", "danger")
                 
             return redirect(url_for('manage_data'))
         
@@ -412,8 +333,8 @@ def manage_data():
         invite['rsvp'] = rsvp_status
         invite['total_guests'] = invite.get('total_guests', 0)
         invite['wishes'] = invite.get('wishes', None)
-            
-    return render_template('manage_data.html', events=all_events, approved_events=dropdown_events, invitations=invitations, role=current_role)
+
+    return render_template('manage_data.html', events=all_events, approved_events=dropdown_events, invitations=invitations, role=current_role, settings=get_global_settings())
 
 # ==========================================
 # --- Superadmin Routs ---
@@ -594,51 +515,104 @@ def cancel_delete_request(id):
 
 # --- ROUTE TAMBAHAN UNTUK BUKU TAMU USHER ---
 
-@app.route('/guestbook', methods=['GET'])
+# --- MODIFIKASI ROUTE GUESTBOOK ---
+@app.route('/guestbook')
 @login_required
 @roles_required('superadmin', 'usher')
 def guestbook():
     settings = get_global_settings()
     if not settings.get('allow_guestbook', True) and session['user']['role'] != 'superadmin':
-        flash("Halaman Buku Tamu saat ini sedang ditutup oleh Superadmin.", "danger")
+        flash("Halaman Guest Book saat ini sedang ditutup.", "danger")
         return redirect(url_for('dashboard'))
 
     current_role = session['user']['role']
-    current_user_id = session['user']['id']
-    selected_event_id = request.args.get('event_id')
+    user_id = session['user']['id']
     
-    allowed_events = []
-    has_permission = True
+    # Ambil data user saat ini untuk mendapatkan starred_events dari database
+    user_data = users_collection.find_one({"_id": ObjectId(user_id)})
+    starred_events = user_data.get('starred_events', [])
 
-    if current_role == 'usher':
-        usher_data = users_collection.find_one({"_id": ObjectId(current_user_id)})
-        allowed_event_ids = usher_data.get('allowed_events', [])
-        if not allowed_event_ids:
-            has_permission = False
-        else:
-            allowed_events = list(events_collection.find({"_id": {"$in": allowed_event_ids}}))
-            if not selected_event_id:
-                selected_event_id = str(allowed_event_ids[0])
-    else:
+    # 1. Ambil semua list acara yang diizinkan untuk user/usher ini
+    if current_role == 'superadmin':
         allowed_events = list(events_collection.find({"status": "Approved"}))
-        if allowed_events and not selected_event_id:
-            selected_event_id = str(allowed_events[0]['_id'])
+    else:
+        allowed_event_ids = [ObjectId(eid) for eid in user_data.get('allowed_events', [])]
+        allowed_events = list(events_collection.find({"_id": {"$in": allowed_event_ids}, "status": "Approved"}))
 
+    has_permission = len(allowed_events) > 0
+
+    # 2. Ambil event_id dari parameter query URL
+    selected_event_id = request.args.get('event_id')
     attended_guests = []
-    if has_permission and selected_event_id:
-        # Mengambil dari koleksi invitations
-        attended_guests = list(invitations_collection.find({
-            "status": "Attend",
-            "event_id": ObjectId(selected_event_id)
-        }).sort("submitted_at", -1))
-        
-    return render_template('guestbook.html', attended_guests=attended_guests, allowed_events=allowed_events, selected_event_id=selected_event_id, has_permission=has_permission)
+    
+    # 3. Data tamu hanya dicari jika pengguna sudah memilih acara
+    if selected_event_id and has_permission:
+        is_allowed = any(str(ev['_id']) == selected_event_id for ev in allowed_events)
+        if is_allowed:
+            attended_guests = list(invitations_collection.find({
+                "event_id": ObjectId(selected_event_id),
+                "status": "Attend"
+            }))
+        else:
+            selected_event_id = None
+    else:
+        selected_event_id = None
+
+    return render_template(
+        'guestbook.html', 
+        allowed_events=allowed_events, 
+        selected_event_id=selected_event_id, 
+        attended_guests=attended_guests,
+        has_permission=has_permission,
+        settings=settings,
+        starred_events=starred_events  # <-- Kirim data bintang dari database ke template
+    )
+
+
+# --- ROUTE BARU: TOGGLE BINTANG DI DATABASE ---
+@app.route('/usher/toggle-star', methods=['POST'])
+@login_required
+@roles_required('superadmin', 'usher')
+def toggle_event_star_db():
+    try:
+        data = request.get_json()
+        event_id = data.get('event_id')
+        if not event_id:
+            return jsonify({"status": "error", "message": "Event ID diperlukan."}), 400
+
+        user_id = session['user']['id']
+        user_data = users_collection.find_one({"_id": ObjectId(user_id)})
+        starred_events = user_data.get('starred_events', [])
+
+        if event_id in starred_events:
+            # Jika sudah ada, hapus dari database
+            users_collection.update_one(
+                {"_id": ObjectId(user_id)},
+                {"$pull": {"starred_events": event_id}}
+            )
+            is_starred = False
+        else:
+            # Jika belum ada, tambahkan ke database
+            users_collection.update_one(
+                {"_id": ObjectId(user_id)},
+                {"$addToSet": {"starred_events": event_id}}
+            )
+            is_starred = True
+
+        return jsonify({"status": "success", "is_starred": is_starred})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/usher/check-in/<id>', methods=['POST'])
 @login_required
 @roles_required('superadmin', 'usher')
 def usher_check_in(id):
     try:
+        settings = get_global_settings()
+        # Jika QR Code dinonaktifkan secara global, tolak proses scanning/check-in via QR
+        if not settings.get('allow_qrcode', True):
+            return jsonify({"status": "error", "message": "Fitur QR Code saat ini sedang dinonaktifkan oleh sistem."}), 403
+
         try:
             invitation_oid = ObjectId(id)
         except Exception:
@@ -656,27 +630,13 @@ def usher_check_in(id):
             usher_data = users_collection.find_one({"_id": ObjectId(session['user']['id'])})
             allowed_events = usher_data.get('allowed_events', [])
             if event_oid not in allowed_events:
-                return jsonify({
-                    "status": "error", 
-                    "message": "Anda tidak memiliki izin dari Superadmin untuk mengelola buku tamu di acara ini!"
-                }), 403
+                return jsonify({"status": "error", "message": "Anda tidak memiliki izin!"}), 403
 
-        # Update status kehadiran langsung ke koleksi invitations
         invitations_collection.update_one(
             {"_id": invitation_oid},
-            {
-                "$set": {
-                    "status": "Attend",
-                    "submitted_at": datetime.datetime.now()
-                }
-            }
+            {"$set": {"status": "Attend", "submitted_at": datetime.datetime.now()}}
         )
-
-        return jsonify({
-            "status": "success", 
-            "message": f"Success! Attendance under the name '{guest_name}' has been recorded."
-        })
-        
+        return jsonify({"status": "success", "message": f"Success! Attendance under the name '{guest_name}' has been recorded."})
     except Exception as e:
         return jsonify({"status": "error", "message": f"Terjadi kesalahan sistem: {str(e)}"}), 500
 
@@ -711,7 +671,8 @@ def usher_search_guest():
         for g in guests:
             results.append({
                 "id": str(g['_id']),
-                "guest_name": g.get('guest_name', 'Tamu Undangan')
+                "guest_name": g.get('guest_name', 'Tamu Undangan'),
+                "domicile": g.get("domicile", "-")
             })
             
         return jsonify({"status": "success", "data": results})
@@ -756,7 +717,7 @@ def manage_people():
                 "password": hashed_password,
                 "role": role
             })
-            flash(f"Pengguna baru '{username}' berhasil didaftarkan!", "success")
+            flash(f"New user '{username}' successfully registered!", "success")
             return redirect(url_for('manage_people'))
 
         # -------------------------------------------------------------
@@ -770,6 +731,7 @@ def manage_people():
             allow_gbook = True if request.form.get('allow_guestbook') else False
             allow_prof = True if request.form.get('allow_profile') else False
             allow_all_inv = True if request.form.get('allow_all_invitations') else False
+            allow_qr = True if request.form.get('allow_qrcode') else False # <-- Tangkap Nilai Switch QR Baru
             
             db.settings.update_one(
                 {"type": "global_config"}, 
@@ -780,7 +742,8 @@ def manage_people():
                     "allow_manage_data": allow_manage,
                     "allow_guestbook": allow_gbook,
                     "allow_profile": allow_prof,
-                    "allow_all_invitations": allow_all_inv
+                    "allow_all_invitations": allow_all_inv,
+                    "allow_qrcode": allow_qr # <-- Simpan ke MongoDB Settings
                 }}, 
                 upsert=True
             )
@@ -873,7 +836,7 @@ def manage_people():
             )
 
             # Menggunakan target_user['username'] untuk flash message karena input username sudah dihapus
-            flash(f"Data pengguna '{target_user.get('username')}' berhasil diperbarui!", "success")
+            flash(f"User data '{target_user.get('username')}' successfully updated!", "success")
             return redirect(url_for('manage_people'))
 
     # --- HANDLING GET REQUEST ---
@@ -974,6 +937,114 @@ def delete_account():
     
     # Return JSON karena proses trigger aksi penghapusan dipanggil via JavaScript/Fetch oleh SweetAlert
     return jsonify({"status": "success", "message": "Akun Anda telah berhasil dihapus secara permanen."})
+
+# PASTIKAN INI DILETAKKAN DI BAGIAN PALING BAWAH FILE APP.PY
+@app.route('/<id>', methods=['GET'])
+def view_invitation(id):
+    # 1. Cari berdasarkan custom_id 10 karakter terlebih dahulu
+    invite = invitations_collection.find_one({"custom_id": id})
+    
+    # 2. Fallback jika ada ID undangan lama yang masih memakai 24 karakter ObjectId
+    if not invite and len(id) == 24:
+        try:
+            invite = invitations_collection.find_one({"_id": ObjectId(id)})
+        except:
+            pass
+        
+    if not invite:
+        # Jika id yang diinput di URL adalah halaman statis lain (misal login, static, dll)
+        # tapi entah mengapa lolos ke rute ini, kita gagalkan dengan 404.
+        return "Undangan tidak ditemukan atau halaman tidak tersedia", 404
+        
+    display_id = invite.get('custom_id', str(invite['_id']))
+    
+    settings = get_global_settings()
+    
+    if not settings.get('allow_all_invitations', True) and not invite.get('is_active', True):
+        # ... (Logika handle undangan nonaktif Anda tetap sama) ...
+        pass
+
+    event = events_collection.find_one({"_id": invite['event_id']})
+    current_rsvp = invite 
+    all_wishes = list(invitations_collection.find({
+        "event_id": invite['event_id'], 
+        "wishes": {"$ne": "", "$exists": True}
+    }))
+    
+    allow_qrcode = settings.get('allow_qrcode', True)
+    # Update link QR code agar tidak mengandung /invitation/
+    qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={request.url_root}{display_id}" if allow_qrcode else None
+    
+    return render_template('invitation.html', invite=invite, display_id=display_id, event=event, current_rsvp=current_rsvp, all_wishes=all_wishes, qr_code_url=qr_code_url, allow_qrcode=allow_qrcode)
+
+@app.route('/<id>/rsvp', methods=['POST'])
+def submit_rsvp(id):
+    try:
+        invitation_oid = ObjectId(id)
+        invitation = invitations_collection.find_one({"_id": invitation_oid})
+        if not invitation:
+            return {"status": "error", "message": "Invitation not found."}, 404
+
+        status = request.form.get('status')
+        total_guests = request.form.get('total_guests', 1)
+
+        # Update langsung ke dokumen invitations_collection
+        invitations_collection.update_one(
+            {"_id": invitation_oid},
+            {
+                "$set": {
+                    "status": status,
+                    "total_guests": int(total_guests) if total_guests else 1,
+                    "submitted_at": datetime.datetime.now()
+                }
+            }
+        )
+        return {"status": "success", "message": "Your attendance confirmation has been successfully saved!"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+@app.route('/<id>/wishes', methods=['POST'])
+def submit_wishes(id):
+    try:
+        invitation_oid = ObjectId(id)
+        invitation = invitations_collection.find_one({"_id": invitation_oid})
+        if not invitation:
+            return {"status": "error", "message": "Invitation not found."}, 404
+            
+        wishes = request.form.get('wishes', '')
+        event_oid = ObjectId(invitation['event_id']) if isinstance(invitation['event_id'], str) else invitation['event_id']
+
+        # Update ucapan ke dalam koleksi invitations
+        invitations_collection.update_one(
+            {"_id": invitation_oid},
+            {
+                "$set": {
+                    "wishes": wishes,
+                    "submitted_at": datetime.datetime.now()
+                }
+            }
+        )
+        
+        # Ambil ulang SEMUA ucapan dari tamu yang memiliki event_id yang sama di koleksi invitations
+        all_wishes = list(invitations_collection.find({
+            "event_id": event_oid, 
+            "wishes": {"$ne": "", "$exists": True}
+        }))
+        
+        wishes_data = []
+        for w in all_wishes:
+            wishes_data.append({
+                "guest_name": w.get('guest_name', 'Tamu Undangan'),
+                "wishes": w.get('wishes', '')
+            })
+
+        return {
+            "status": "success", 
+            "message": "Terima kasih! Doa dan ucapan Anda telah diperbarui.",
+            "wishes_list": wishes_data
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
 
 if __name__ == '__main__':
     app.run(debug=True)

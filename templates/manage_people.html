@@ -2,11 +2,16 @@
 {% block content %}
 
 <div class="container my-2">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold text-dark">👤 Manage People & Settings</h2>
-        <!-- TOMBOL UNTUK MEMBUKA MODAL REGISTER USER BARU -->
-        <button type="button" class="btn btn-success fw-bold" data-bs-toggle="modal" data-bs-target="#addUserModal">
-            Tambah User Baru
+    <!-- JUDUL HALAMAN MANAGE PEOPLE -->
+    <div class="d-flex align-items-center justify-content-between mb-4 mt-2">
+        <div>
+            <h2 class="fw-bold text-dark m-0 d-flex align-items-center gap-2">
+                <i class="bi bi-people text-primary"></i> Manage People & Settings
+            </h2>
+            <p class="text-muted small m-0">Control application system preferences, configure security switches, and grant user roles access permissions.</p>
+        </div>
+        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addUserModal">
+            Add New User
         </button>
     </div>
 
@@ -20,45 +25,51 @@
                         
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" name="allow_registration" id="regSwitch" {% if settings.allow_registration %}checked{% endif %}>
-                            <label class="form-check-label fw-semibold" for="regSwitch">Buka Halaman Registrasi</label>
+                            <label class="form-check-label fw-semibold" for="regSwitch">Open Registration Page</label>
                         </div>
 
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" name="allow_login" id="loginSwitch" {% if settings.allow_login %}checked{% endif %}>
-                            <label class="form-check-label fw-semibold" for="loginSwitch">Buka Halaman Login</label>
+                            <label class="form-check-label fw-semibold" for="loginSwitch">Open Login Page</label>
                         </div>
 
-                        <!-- FITUR BARU: Switch Dashboard -->
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" name="allow_dashboard" id="dashSwitch" {% if settings.allow_dashboard %}checked{% endif %}>
-                            <label class="form-check-label fw-semibold" for="dashSwitch">Buka Akses Dashboard</label>
+                            <label class="form-check-label fw-semibold" for="dashSwitch">Open Dashboard Access</label>
                         </div>
 
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" name="allow_profile" id="profileSwitch" {% if settings.allow_profile %}checked{% endif %}>
-                            <label class="form-check-label fw-semibold" for="profileSwitch">Buka Akses Halaman Profile</label>
+                            <label class="form-check-label fw-semibold" for="profileSwitch">Open Profile Page Access</label>
                         </div>
 
-                        <!-- FITUR BARU: Switch Manage Data -->
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" name="allow_manage_data" id="manageSwitch" {% if settings.allow_manage_data %}checked{% endif %}>
-                            <label class="form-check-label fw-semibold" for="manageSwitch">Buka Akses Manage Data</label>
+                            <label class="form-check-label fw-semibold" for="manageSwitch">Open Manage Data Access</label>
                         </div>
 
-                        <div class="form-check form-switch mb-4 p-2 bg-light rounded border border-danger">
-                            <input class="form-check-input ms-0 me-2" type="checkbox" name="allow_all_invitations" id="allInvitations" {% if settings.allow_all_invitations %}checked{% endif %}>
-                            <label class="form-check-label fw-bold text-danger" for="allInvitations">Aktifkan Semua Undangan</label>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" name="allow_all_invitations" id="allInvitations" {% if settings.allow_all_invitations %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="allInvitations">Enable All Invitations</label>
                             <div class="form-text text-muted small mt-1" style="font-size: 0.75rem;">
-                                Jika dinonaktifkan, semua tautan undangan tamu tidak akan bisa diakses/dibuka (berlaku global).
+                                If disabled, all guest invitation links will not be accessible/openable (applies globally).
+                            </div>
+                        </div>
+
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" name="allow_qrcode" id="qrSwitch" {% if settings.allow_qrcode %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="qrSwitch">Enable the Invitation QR Code Feature</label>
+                            <div class="form-text text-muted small mt-1" style="font-size: 0.75rem;">
+                                If disabled, QR codes will not be generated on the guest side or the detail panel, and the guest book scanner module will be turned off.
                             </div>
                         </div>
 
                         <div class="form-check form-switch mb-4">
                             <input class="form-check-input" type="checkbox" name="allow_guestbook" id="gbookSwitch" {% if settings.allow_guestbook %}checked{% endif %}>
-                            <label class="form-check-label fw-semibold" for="gbookSwitch">Buka Akses Buku Tamu</label>
+                            <label class="form-check-label fw-semibold" for="gbookSwitch">Open Guest Book Access</label>
                         </div>
 
-                        <button type="submit" class="btn btn-primary w-100 py-2">Simpan Pengaturan</button>
+                        <button type="submit" class="btn btn-primary w-100 py-2">Save Settings</button>
                     </form>
                 </div>
             </div>
@@ -71,11 +82,11 @@
                     <div class="table-responsive">
                         <table class="table table-striped table-hover mb-0 align-middle">
                             <thead class="table-dark">
-                                <tr>
+                                <tr class="text-center">
                                     <th class="px-3">Username</th>
                                     <th>Email</th>
                                     <th>Role</th>
-                                    <th class="text-center" style="width: 280px;">Aksi</th>
+                                    <th class="text-center" style="width: 280px;">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -87,18 +98,18 @@
                                     <td class="text-center">
                                         <!-- <div class="d-flex justify-content-center gap-1 flex-wrap"></div> -->
                                         <div class="btn-group btn-group-sm" role="group">
-                                            <button type="button" class="btn btn-sm btn-outline-info fw-semibold" data-bs-toggle="modal" data-bs-target="#detailUserModal-{{ u._id }}">
+                                            <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#detailUserModal-{{ u._id }}">
                                                 Detail
                                             </button>
 
                                             {% if u.role != 'superadmin' or role == 'superadmin' %}
-                                            <button type="button" class="btn btn-sm btn-outline-warning fw-semibold" data-bs-toggle="modal" data-bs-target="#editUserModal-{{ u._id }}">
+                                            <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editUserModal-{{ u._id }}">
                                                 Edit
                                             </button>
                                             {% endif %}
                                             
-                                            <button type="button" class="btn btn-sm btn-outline-danger fw-semibold btn-delete-user" data-url="/manage-people/delete-user/{{ u._id }}" data-username="{{ u.username }}">
-                                                Hapus
+                                            <button type="button" class="btn btn-sm btn-outline-danger btn-delete-user" data-url="/manage-people/delete-user/{{ u._id }}" data-username="{{ u.username }}">
+                                                Delete
                                             </button>
                                         </div>
                                     </td>
@@ -140,7 +151,8 @@
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Role Akses</label>
                         <select name="role" class="form-select" required>
-                            <option value="user" selected>User (Guest/Client)</option>
+                            <option value="" disabled selected>-- Choose Role --</option>
+                            <option value="user">User (Guest/Client)</option>
                             <option value="usher">Usher (Event Assistant)</option>
                             <option value="admin">Admin</option>
                             <option value="superadmin">Superadmin</option>
@@ -149,8 +161,8 @@
                 </div>
                 
                 <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-success btn-sm fw-bold">Daftarkan User</button>
+                    <button type="submit" class="btn btn-success btn-sm">Register User</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
                 </div>
             </form>
         </div>
@@ -163,7 +175,7 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header bg-info text-dark">
-                    <h5 class="modal-title fw-bold">👁️ Detail Pengguna</h5>
+                    <h5 class="modal-title fw-bold">Detail Pengguna</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body text-start">
@@ -230,7 +242,7 @@
         <div class="modal-dialog modal-md">
             <div class="modal-content">
                 <div class="modal-header bg-dark text-white">
-                    <h5 class="modal-title fw-bold" id="editUserModalLabel-{{ u._id }}">📝 Edit Pengguna: {{ u.username }}</h5>
+                    <h5 class="modal-title fw-bold" id="editUserModalLabel-{{ u._id }}">Edit Pengguna: {{ u.username }}</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form action="/manage-people" method="POST">
@@ -241,6 +253,7 @@
                         <div class="mb-3">
                             <label class="form-label small fw-bold">Role Akses</label>
                             <select name="role" class="form-select role-select" data-user-id="{{ u._id }}" {% if u.role == 'superadmin' %}disabled{% endif %} required>
+                                <option value="" disabled selected>-- Choose Role --</option>
                                 <option value="user" {% if u.role == 'user' %}selected{% endif %}>User (Guest/Client)</option>
                                 <option value="usher" {% if u.role == 'usher' %}selected{% endif %}>Usher (Event Assistant)</option>
                                 <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>Admin</option>
@@ -296,8 +309,8 @@
                     </div>
                     
                     <div class="modal-footer bg-light">
-                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" class="btn btn-success btn-sm fw-bold">Simpan Perubahan</button>
+                        <button type="submit" class="btn btn-success btn-sm">Save Changes</button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
                     </div>
                 </form>
             </div>

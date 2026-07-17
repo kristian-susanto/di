@@ -8,8 +8,8 @@
     <div class="col-md-6 col-sm-10">
         <div class="card shadow-sm border-0 rounded-3 p-4 bg-white mb-4">
             <div class="text-center mb-4">
-                <h3 class="fw-bold text-dark">⚙️ Pengaturan Profil</h3>
-                <p class="text-muted small">Perbarui data informasi akun Anda secara berkala</p>
+                <h3 class="fw-bold text-dark">Profile Settings</h3>
+                <p class="text-muted small">Update your account information data regularly</p>
             </div>
 
             <form id="profileForm" action="{{ url_for('profile') }}" method="POST">
@@ -25,7 +25,7 @@
                     <input type="email" name="email" id="email" class="form-control" value="superadmin@gmail.com">
                 </div>
 
-                <!-- Password Baru dengan Toggle Visibility -->
+                <!-- New Password -->
                 <div class="mb-3 text-start">
                     <label class="form-label">New Password (Leave blank if you don't want to change it)</label>
                     <div class="input-group">
@@ -36,16 +36,16 @@
                     </div>
                 </div>
 
-                <!-- Tombol Simpan -->
+                <!-- Save Button -->
                 <button type="submit" class="btn btn-primary w-100 mt-3">Save Changes</button>
-                </form>
+            </form>
         </div>
 
         <div class="card shadow-sm border-1 border-danger rounded-3 p-4 bg-white">
-            <h5 class="fw-bold text-danger mb-2">🔴 Zona Bahaya</h5>
-            <p class="text-muted small mb-3">Setelah Anda menghapus akun, semua data yang berkaitan dengan akun ini akan hilang secara permanen dan tidak dapat dikembalikan.</p>
+            <h5 class="fw-bold text-danger mb-2">🔴 Danger Zone</h5>
+            <p class="text-muted small mb-3">Once you delete an account, all data associated with this account will be permanently lost and cannot be recovered.</p>
             <button type="button" id="btnDeleteAccount" class="btn btn-outline-danger w-100 py-2 fw-semibold">
-                Hapus Akun Saya
+                Delete My Account
             </button>
         </div>
     </div>
@@ -121,7 +121,7 @@
                     if (data.status === 'success') {
                         Swal.fire({
                             icon: 'success',
-                            title: 'Berhasil Dihapus!',
+                            title: 'Successfully Deleted!',
                             text: data.message,
                             confirmButtonText: 'OK'
                         }).then(() => {
@@ -129,11 +129,11 @@
                             window.location.href = "{{ url_for('login') }}";
                         });
                     } else {
-                        Swal.fire('Gagal!', 'Terjadi kendala saat menghapus akun.', 'error');
+                        Swal.fire('Gagal!', 'There was a problem deleting the account.', 'error');
                     }
                 })
                 .catch(err => {
-                    Swal.fire('Error!', 'Tidak dapat terhubung ke server.', 'error');
+                    Swal.fire('Error!', 'Unable to connect to server.', 'error');
                 });
             }
         });

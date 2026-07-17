@@ -376,7 +376,7 @@
             <h3 class="fw-bold mb-3" style="font-family: 'Playfair Display', serif;">Konfirmasi Kehadiran (RSVP)</h3>
             <p class="text-muted small mb-4">Mohon isi kehadiran Anda dan jumlah pax yang akan dibawa.</p>
 
-            <form id="rsvpForm" action="/invitation/{{ invite._id }}/rsvp" method="POST">
+            <form id="rsvpForm" action="/{{ display_id }}/rsvp" method="POST">
               <div class="mb-3 text-start">
                 <label class="form-label small fw-bold">Nama Tamu</label>
                 <input type="text" name="guest_name" class="form-control" value="{{ invite.guest_name }}" readonly required>
@@ -418,7 +418,7 @@
             <h3 class="fw-bold mb-3" style="font-family: 'Playfair Display', serif;">Kirim Doa Restu & Ucapan</h3>
             <p class="text-muted small mb-4">Berikan ucapan selamat manis Anda untuk kedua mempelai.</p>
 
-            <form id="wishesForm" action="/invitation/{{ invite._id }}/wishes" method="POST"> 
+            <form id="wishesForm" action="/{{ display_id }}/wishes" method="POST">
               <div class="mb-3 text-start">
                 <label class="form-label small fw-bold">Nama Pengirim</label>
                 <input type="text" name="guest_name" class="form-control" value="{{ invite.guest_name }}" readonly required>
@@ -450,6 +450,8 @@
           </div>
         </div>
 
+        <!-- Cari bagian Kode HTML Digital Guest Book QR Code di invitation.html, bungkus dengan kode if berikut -->
+        {% if allow_qrcode %}
         <div class="container my-5 text-center">
           <div class="p-4 mx-auto border bg-white shadow-sm d-inline-block" style="border-radius: 20px; max-width: 320px;">
             <h5 class="fw-bold mb-2" style="font-family: 'Playfair Display', serif;">Digital Guest Book QR Code</h5>
@@ -464,6 +466,7 @@
             </div>
           </div>
         </div>
+        {% endif %}
 
         <div class="mt-5 pt-4 text-center">
           <h2

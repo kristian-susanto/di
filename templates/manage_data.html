@@ -2,6 +2,16 @@
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
+<!-- JUDUL HALAMAN MANAGE DATA -->
+<div class="d-flex align-items-center justify-content-between mb-4 mt-2">
+    <div>
+        <h2 class="fw-bold text-dark m-0 d-flex align-items-center gap-2">
+            <i class="bi bi-database-gear text-primary"></i> Manage Data
+        </h2>
+        <p class="text-muted small m-0">Create, edit, and organize your events along with their digital guest invitations.</p>
+    </div>
+</div>
+
 <div class="row g-4">
   {% if role in ['superadmin', 'admin'] %}
   <div class="col-md-4">
@@ -57,7 +67,7 @@
       <h5 class="fw-bold text-secondary mb-3">Events List</h5>
       <table class="table table-bordered align-middle small">
         <thead class="table-light">
-          <tr>
+          <tr class="text-center">
             <th style="width: 60px;">Logo</th>
             <th>Event Name</th>
             <th>Date & Time</th>
@@ -71,7 +81,7 @@
           <tr>
             <td class="text-center fs-4">
               {% if ev.event_logo and (ev.event_logo.startswith('http://') or ev.event_logo.startswith('https://') or ev.event_logo.startswith('/')) %}
-                <img src="{{ ev.event_logo }}" alt="logo" class="rounded border" style="width: 32px; height: 32px; object-fit: cover;">
+                <img src="{{ ev.event_logo }}" alt="logo" class="rounded border" style="width: 35px; height: 35px; object-fit: cover;">
               {% else %}
                 {{ ev.event_logo if ev.event_logo else '🎉' }}
               {% endif %}
@@ -91,7 +101,7 @@
               <span class="badge bg-warning text-dark">{{ ev.status }}</span>
               {% endif %}
             </td>
-            <td>
+            <td class="text-center">
               <div class="btn-group btn-group-sm" role="group">
                 {% if role in ['superadmin', 'admin'] %}
                   <button class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#detailEventModal{{ ev._id }}">Detail</button>
@@ -137,7 +147,7 @@
       <h5 class="fw-bold text-secondary mb-3">Generated Invitations</h5>
       <table class="table table-striped align-middle small">
         <thead class="table-dark">
-          <tr>
+          <tr class="text-center">
             <th>Event Name</th>
             <th>Guest Name</th>
             <th>Status</th>
@@ -156,17 +166,17 @@
               {% elif invite.status == 'Will not be attend' %}
               <span class="badge bg-danger">Will not be attend</span>
               {% elif invite.status == 'Attend' %}
-              <span class="badge bg-success">Attend</span>
+              <span class="badge bg-primary">Attend</span>
               {% elif invite.status == 'Pending Deletion' %}
               <span class="badge bg-warning">Pending Deletion</span>
               {% else %}
-              <span class="badge bg-secondary">{{ invite.status if invite.status else 'Active' }}</span>
+              <span class="badge bg-info">{{ invite.status if invite.status else 'Active' }}</span>
               {% endif %}
             </td>
-            <td>
-              <a href="{{ url_for('view_invitation', id=invite._id) }}" target="_blank" class="btn btn-sm btn-outline-primary py-1">Open Link</a>
+            <td class="text-center">
+              <a href="{{ url_for('view_invitation', id=invite.custom_id if invite.custom_id else invite._id) }}" target="_blank" class="btn btn-sm btn-outline-primary py-1">Open Link</a>
             </td>
-            <td>
+            <td class="text-center">
               <div class="btn-group btn-group-sm" role="group">
                 {% if role in ['superadmin', 'admin'] %}
                   <button class="btn btn-outline-info py-1" data-bs-toggle="modal" data-bs-target="#detailInviteModal{{ invite._id }}">Detail</button>
@@ -212,7 +222,7 @@
       <div class="modal-body">
         <div class="text-center mb-3">
           {% if ev.event_logo and (ev.event_logo.startswith('http://') or ev.event_logo.startswith('https://') or ev.event_logo.startswith('/')) %}
-            <img src="{{ ev.event_logo }}" alt="logo" class="img-thumbnail" style="width: 70px; height: 70px; object-fit: cover;">
+            <img src="{{ ev.event_logo }}" alt="logo" class="img-thumbnail" style="width: 100px; height: 100px; object-fit: cover;">
           {% else %}
             <div class="fs-1">{{ ev.event_logo if ev.event_logo else '🎉' }}</div>
           {% endif %}
@@ -270,11 +280,28 @@
           
           <div class="mb-3">
             <label class="form-label small fw-bold">Tempat Acara / Google Maps Search</label>
-            <input type="text" name="event_location" class="form-control location-search" value="{{ ev.event_location }}" placeholder="Cari nama hotel/gedung..." required>
+            <!-- 1. Tambahkan ID unik pada input berdasarkan ID Event, serta panggil fungsi oninput -->
+            <input 
+              type="text" 
+              name="event_location" 
+              id="locationInput{{ ev._id }}" 
+              class="form-control location-search" 
+              value="{{ ev.event_location }}" 
+              placeholder="Cari nama hotel/gedung..." 
+              oninput="updateMapPreview('{{ ev._id }}')" 
+              required
+            >
             
             <!-- TAMBAHAN: Live Preview Peta Lokasi Acara -->
             <div class="mt-2 border rounded overflow-hidden shadow-sm" style="max-width: 100%; height: 150px;">
-              <iframe src="{{ embed_maps_url }}" style="width: 100%; height: 100%; border: 0;" allowfullscreen="" loading="lazy"></iframe>
+              <!-- 2. Tambahkan ID unik pada iframe agar JavaScript bisa mengubah src-nya secara spesifik -->
+              <iframe 
+                id="mapPreview{{ ev._id }}"
+                src="{{ embed_maps_url }}" 
+                style="width: 100%; height: 100%; border: 0;" 
+                allowfullscreen="" 
+                loading="lazy"
+              ></iframe>
             </div>
           </div>
 
@@ -296,8 +323,8 @@
           <!-- Bagian "Edit Status" telah dihapus dari sini -->
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
         </div>
       </form>
     </div>
@@ -331,13 +358,21 @@
               {{ invite.status if invite.status else 'Active' }}
             {% endif %}
           </td></tr>
-          <tr><td class="fw-bold text-secondary">Link:</td><td><a href="{{ url_for('view_invitation', id=invite._id) }}" target="_blank" class="small text-break">{{ request.url_root }}invitation/{{ invite._id }}</a></td></tr>
+          <tr><td class="fw-bold text-secondary">Link:</td><td><a href="{{ url_for('view_invitation', id=invite.custom_id if invite.custom_id else invite._id) }}" target="_blank" class="small text-break">{{ request.url_root }}{{ invite.custom_id if invite.custom_id else invite._id }}</a></td></tr>
+          <!-- Cari di bagian <tr> <td class="fw-bold text-secondary align-middle">QR Code:</td> ... </tr> lalu ubah menjadi -->
+          {% if settings is defined and settings.allow_qrcode %}
           <tr>
             <td class="fw-bold text-secondary align-middle">QR Code:</td>
             <td>
-              <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={{ request.url_root }}invitation/{{ invite._id }}" alt="QR Code" class="img-thumbnail" style="width: 110px;">
+              <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={{ request.url_root }}{{ invite._id }}" alt="QR Code" class="img-thumbnail" style="width: 110px;">
             </td>
           </tr>
+          {% else %}
+          <tr>
+            <td class="fw-bold text-secondary align-middle">QR Code:</td>
+            <td><span class="text-muted small italic">Fitur QR Code dinonaktifkan secara global</span></td>
+          </tr>
+          {% endif %}
           <tr><td class="fw-bold text-secondary">Number of People:</td><td>{{ invite.total_guests if invite.total_guests else 0 }}</td></tr>
           <tr><td class="fw-bold text-secondary">Wishes Received:</td><td>{{ invite.wishes if invite.wishes else '-' }}</td></tr>
         </table>
@@ -371,8 +406,8 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
         </div>
       </form>
     </div>
@@ -400,6 +435,22 @@
         }
         
         reader.readAsDataURL(input.files[0]);
+    }
+  }
+
+  function updateMapPreview(eventId) {
+    // Ambil element input dan iframe yang sesuai dengan eventId modal tersebut
+    const locationInput = document.getElementById('locationInput' + eventId);
+    const mapPreview = document.getElementById('mapPreview' + eventId);
+    
+    if (locationInput && mapPreview) {
+      const locationQuery = encodeURIComponent(locationInput.value.trim());
+      
+      // Jika input tidak kosong, perbarui src iframe dengan lokasi baru
+      if (locationQuery !== "") {
+        const newMapUrl = `https://maps.google.com/maps?q=${locationQuery}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+        mapPreview.src = newMapUrl;
+      }
     }
   }
 
