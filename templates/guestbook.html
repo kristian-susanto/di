@@ -17,7 +17,7 @@
     </div>
     {% else %}
 
-    <!-- JIKA PUNYA IZIN: TAMPILKAN SELEKSI ACARA DI ATAS TENGAH -->
+    <!-- JIKA PUNYA IZIN: TAMPILKAN SELEKSI ACARA -->
     <div class="row justify-content-center mb-4">
       <div class="col-md-6 text-center">
           <div class="p-3 bg-white rounded shadow-sm border">
@@ -35,15 +35,30 @@
 
     <!-- TAMPILAN UTAMA SCANNER & DAFTAR HADIR -->
     <div class="row g-4">
-        <!-- Bagian Kiri: Scanner -->
+        <!-- Bagian Kiri: Scanner & Input Pencarian Manual -->
         <div class="col-md-5">
-            <div class="card shadow-sm border-0 h-100 bg-white">
+            <div class="card shadow-sm border-0 bg-white mb-4">
                 <div class="card-body text-center p-4">
                     <h4 class="fw-bold text-dark mb-1">QR Code Scanner Usher</h4>
                     <p class="text-muted small mb-4">Arahkan kamera ke QR Code undangan digital milik tamu.</p>
-                    
-                    <!-- Wadah scan HTML5-QRCODE -->
                     <div id="reader" class="mx-auto rounded border bg-light" style="width: 100%; max-width: 380px;"></div>
+                </div>
+            </div>
+
+            <!-- FITUR BARU: Pencarian Tamu Manual -->
+            <div class="card shadow-sm border-0 bg-white">
+                <div class="card-header bg-secondary text-white fw-bold py-3">
+                    🔍 Input Kehadiran Manual
+                </div>
+                <div class="card-body p-4">
+                    <div class="mb-3">
+                        <label for="searchGuestInput" class="form-label small fw-bold text-muted">Cari Nama Tamu</label>
+                        <input type="text" id="searchGuestInput" class="form-control" placeholder="Ketik nama tamu di sini..." oninput="searchGuestManual(this.value)">
+                    </div>
+                    <!-- Wadah Hasil Pencarian -->
+                    <div id="searchResultList" class="list-group style-res" style="max-height: 200px; overflow-y: auto;">
+                        <p class="text-center text-muted small my-2">Ketik nama untuk mencari tamu...</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -75,7 +90,7 @@
                                     {% endfor %}
                                 {% else %}
                                     <tr>
-                                        <td colspan="3" class="text-center py-4 text-muted small">Belum ada tamu yang dicatat hadir melalui scan untuk acara ini.</td>
+                                        <td colspan="3" class="text-center py-4 text-muted small">Belum ada tamu yang dicatat hadir untuk acara ini.</td>
                                     </tr>
                                 {% endif %}
                             </tbody>
@@ -87,27 +102,95 @@
     </div>
     {% endif %}
 </div>
+
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <script>
+    const currentEventId = "{{ selected_event_id }}";
+
     function switchEvent(eventId) {
-        window.location.href = "{{ url_for('usher_guestbook') }}?event_id=" + eventId;
+        window.location.href = "{{ url_for('guestbook') }}?event_id=" + eventId;
     }
 
-    // Konfigurasi dasar untuk SweetAlert2 Toast
     const Toast = Swal.mixin({
         toast: true,
-        position: 'top', // Tampil di bagian atas tengah layar
-        showConfirmButton: false, // Menghilangkan tombol OK
-        timer: 5000, // Durasi tampil 5 detik (5000 ms)
-        timerProgressBar: true, // Menampilkan progress bar waktu berjalan
+        position: 'top',
+        showConfirmButton: false,
+        timer: 4000,
+        timerProgressBar: true,
         didOpen: (toast) => {
             toast.addEventListener('mouseenter', Swal.stopTimer)
             toast.addEventListener('mouseleave', Swal.resumeTimer)
         }
     });
 
+    // FUNGSI PENCARIAN GUEST MANUAL VIA AJAX
+    function searchGuestManual(query) {
+        const resultContainer = document.getElementById('searchResultList');
+        if (!query.trim()) {
+            resultContainer.innerHTML = '<p class="text-center text-muted small my-2">Ketik nama untuk mencari tamu...</p>';
+            return;
+        }
+
+        fetch(`/usher/search-guest?event_id=${currentEventId}&q=${encodeURIComponent(query)}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                resultContainer.innerHTML = '';
+                if (data.data.length === 0) {
+                    resultContainer.innerHTML = '<p class="text-center text-danger small my-2">Tamu tidak ditemukan / sudah hadir.</p>';
+                    return;
+                }
+                data.data.forEach(guest => {
+                    const item = document.createElement('div');
+                    item.className = 'list-group-item d-flex justify-content-between align-items-center py-2';
+                    item.innerHTML = `
+                        <span class="fw-semibold text-dark small">${guest.guest_name}</span>
+                        <button class="btn btn-sm btn-success py-1 px-3 fw-bold" style="font-size:0.75rem;" onclick="processCheckIn('${guest.id}')">Set Hadir</button>
+                    `;
+                    resultContainer.appendChild(item);
+                });
+            }
+        });
+    }
+
+    // FUNGSI PROSES CHECK-IN (DIGUNAKAN SCANNER & TOMBOL MANUAL)
+    function processCheckIn(invitationId) {
+        Toast.fire({
+            icon: 'info',
+            title: 'Sedang memproses kehadiran...'
+        });
+
+        fetch(`/usher/check-in/${invitationId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                Toast.fire({
+                    icon: 'success',
+                    title: data.message
+                }).then(() => {
+                    window.location.reload();
+                });
+            } else {
+                Toast.fire({
+                    icon: 'error',
+                    title: data.message || 'Gagal memproses kehadiran.'
+                });
+            }
+        })
+        .catch(() => {
+            Toast.fire({
+                icon: 'error',
+                title: 'Terjadi kesalahan jaringan atau server.'
+            });
+        });
+    }
+
+    // SCANNER QR CODE LOGIC
     document.addEventListener("DOMContentLoaded", function () {
         const readerElement = document.getElementById('reader');
         if (!readerElement) return;
@@ -116,61 +199,17 @@
             "reader", { fps: 10, qrbox: 250 }, false
         );
 
-        function onScanSuccess(decodedText, decodedResult) {
-            // Hentikan scan sementara agar tidak menembak request berkali-kali
+        function onScanSuccess(decodedText) {
             html5QrcodeScanner.clear();
-
-            // Ekstrak ID dari URL jika ter-scan penuh
             let invitationId = decodedText;
             if (decodedText.includes('/invitation/')) {
                 const parts = decodedText.split('/invitation/');
                 invitationId = parts[parts.length - 1].split(/[?#]/)[0];
             }
-
-            // Notifikasi awal bahwa sistem sedang memproses
-            Toast.fire({
-                icon: 'info',
-                title: 'Sedang memproses kehadiran...'
-            });
-
-            // Kirim request ke backend
-            fetch(`/usher/check-in/${invitationId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    Toast.fire({
-                        icon: 'success',
-                        title: data.message // Pesan sukses dari backend (ex: "Berhasil! Kehadiran atas nama 'a' telah dicatat")
-                    }).then(() => {
-                        // Refresh halaman otomatis setelah toast selesai/ditutup
-                        window.location.reload();
-                    });
-                } else {
-                    Toast.fire({
-                        icon: 'error',
-                        title: data.message || 'Gagal memproses kehadiran.'
-                    }).then(() => {
-                        window.location.reload();
-                    });
-                }
-            })
-            .catch(err => {
-                Toast.fire({
-                    icon: 'error',
-                    title: 'Terjadi kesalahan jaringan atau server.'
-                }).then(() => {
-                    window.location.reload();
-                });
-            });
+            processCheckIn(invitationId);
         }
 
         html5QrcodeScanner.render(onScanSuccess);
     });
 </script>
-
 {% endblock %}

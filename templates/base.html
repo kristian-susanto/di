@@ -77,7 +77,7 @@
                 <li><a class="dropdown-item py-2" href="{{ url_for('manage_people') }}">👥 Manage People</a></li>
                 {% endif %}
                 {% if session['user']['role'] in ['superadmin', 'usher'] %}
-                <li><a class="dropdown-item py-2" href="/usher/guestbook">📖 Guest Book</a></li>
+                <li><a class="dropdown-item py-2" href="/guestbook">📖 Guest Book</a></li>
                 {% endif %}
                 <li><hr class="dropdown-divider my-0"></li>
                 <li>
@@ -139,14 +139,13 @@
             e.preventDefault(); // Prevent direct redirects
 
             Swal.fire({
-              title: 'Apakah Anda yakin ingin keluar?',
-              text: "Sesi Anda akan berakhir.",
+              title: 'Are you sure you want to exit?',
+              text: "Your session will expire.",
               icon: 'warning',
+              showCloseButton: true,
               showCancelButton: true,
               confirmButtonColor: '#dc3545',
-              cancelButtonColor: '#6c757d',
-              confirmButtonText: 'Ya, Keluar!',
-              cancelButtonText: 'Batal'
+              cancelButtonColor: '#6c757d'
             }).then((result) => {
               if (result.isConfirmed) {
                 // Navigate to Flask logout route

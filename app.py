@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, render_template_string, request, redirect, url_for, session, flash, jsonify
 from functools import wraps
 from pymongo import MongoClient
 from bson.objectid import ObjectId
@@ -24,9 +24,8 @@ if not os.path.exists(UPLOAD_FOLDER):
 client = MongoClient(os.getenv("MONGO_URI"))
 db = client['digital_invitation']
 users_collection = db.users
-invitations_collection = db.invitations
 events_collection = db.events
-rsvps_collection = db.rsvps
+invitations_collection = db.invitations
 
 # --- DECORATORS (Role & Auth Protection) ---
 def login_required(f):
@@ -63,24 +62,33 @@ def view_invitation(id):
     if not invite:
         return "Undangan tidak ditemukan", 404
         
-    # FITUR BARU: Cek jika link telah dinonaktifkan/pasif oleh Admin/Superadmin
-    if not invite.get('is_active', True):
+    settings = get_global_settings()
+    
+    if not settings.get('allow_all_invitations', True) and not invite.get('is_active', True):
         return render_template_string('''
             <!DOCTYPE html>
             <html>
             <head><title>Undangan Nonaktif</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"></head>
             <body class="bg-light d-flex align-items-center justify-content-center" style="height: 100vh;">
                 <div class="card p-5 text-center shadow" style="max-width: 500px;">
-                    <h1 class="text-danger mb-3">⚠️ Undangan Tidak Aktif</h1>
-                    <p class="text-muted">Maaf, tautan undangan digital ini sudah dinonaktifkan atau masa berlakunya telah habis.</p>
+                    <h1 class="text-danger mb-3">⚠️ Undangan Ditutup</h1>
+                    <p class="text-muted">Maaf, akses undangan digital saat ini sedang dinonaktifkan sementara.</p>
                 </div>
             </body>
             </html>
         '''), 403
-        
+
     event = events_collection.find_one({"_id": invite['event_id']})
-    current_rsvp = rsvps_collection.find_one({"invitation_id": ObjectId(id), "guest_name": invite['guest_name']})
-    all_wishes = list(rsvps_collection.find({"event_id": invite['event_id'], "wishes": {"$ne": "", "$exists": True}}))
+    
+    # Karena data bersatu di invitations, current_rsvp adalah data invite itu sendiri
+    current_rsvp = invite 
+    
+    # Cari ucapan (wishes) dari invitations_collection yang event_id-nya sama
+    all_wishes = list(invitations_collection.find({
+        "event_id": invite['event_id'], 
+        "wishes": {"$ne": "", "$exists": True}
+    }))
+    
     qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={id}"
     
     return render_template('invitation.html', invite=invite, event=event, current_rsvp=current_rsvp, all_wishes=all_wishes, qr_code_url=qr_code_url)
@@ -91,27 +99,23 @@ def submit_rsvp(id):
         invitation_oid = ObjectId(id)
         invitation = invitations_collection.find_one({"_id": invitation_oid})
         if not invitation:
-            return {"status": "error", "message": "Undangan tidak ditemukan."}, 404
+            return {"status": "error", "message": "Invitation not found."}, 404
 
-        guest_name = request.form.get('guest_name')
-        attendance = request.form.get('attendance')
+        status = request.form.get('status')
         total_guests = request.form.get('total_guests', 1)
 
-        rsvps_collection.update_one(
-            {"invitation_id": invitation_oid, "guest_name": guest_name},
+        # Update langsung ke dokumen invitations_collection
+        invitations_collection.update_one(
+            {"_id": invitation_oid},
             {
                 "$set": {
-                    "invitation_id": invitation_oid,
-                    "event_id": invitation.get('event_id'),
-                    "guest_name": guest_name,
-                    "attendance": attendance,
+                    "status": status,
                     "total_guests": int(total_guests) if total_guests else 1,
                     "submitted_at": datetime.datetime.now()
                 }
-            },
-            upsert=True
+            }
         )
-        return {"status": "success", "message": "Konfirmasi kehadiran Anda berhasil disimpan!"}
+        return {"status": "success", "message": "Your attendance confirmation has been successfully saved!"}
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
@@ -121,36 +125,28 @@ def submit_wishes(id):
         invitation_oid = ObjectId(id)
         invitation = invitations_collection.find_one({"_id": invitation_oid})
         if not invitation:
-            return {"status": "error", "message": "Undangan tidak ditemukan."}, 404
+            return {"status": "error", "message": "Invitation not found."}, 404
             
-        guest_name = request.form.get('guest_name')
         wishes = request.form.get('wishes', '')
-
-        # Pastikan event_id disimpan sebagai ObjectId asli, bukan string
         event_oid = ObjectId(invitation['event_id']) if isinstance(invitation['event_id'], str) else invitation['event_id']
 
-        # Update ucapan tamu saat ini
-        rsvps_collection.update_one(
-            {"invitation_id": invitation_oid},
+        # Update ucapan ke dalam koleksi invitations
+        invitations_collection.update_one(
+            {"_id": invitation_oid},
             {
                 "$set": {
-                    "invitation_id": invitation_oid,
-                    "event_id": event_oid,
-                    "guest_name": guest_name,
                     "wishes": wishes,
                     "submitted_at": datetime.datetime.now()
                 }
-            },
-            upsert=True
+            }
         )
         
-        # Ambil ulang SEMUA ucapan yang berada di bawah event_id yang sama
-        all_wishes = list(rsvps_collection.find({
+        # Ambil ulang SEMUA ucapan dari tamu yang memiliki event_id yang sama di koleksi invitations
+        all_wishes = list(invitations_collection.find({
             "event_id": event_oid, 
             "wishes": {"$ne": "", "$exists": True}
         }))
         
-        # Susun struktur datanya dengan aman
         wishes_data = []
         for w in all_wishes:
             wishes_data.append({
@@ -179,16 +175,17 @@ def get_global_settings():
             "allow_dashboard": True,    
             "allow_manage_data": True,  
             "allow_guestbook": True,
-            "allow_profile": True       # Pengaturan baru untuk halaman Profile
+            "allow_profile": True,
+            "allow_all_invitations": True  # Default: mengizinkan semua undangan dibuka
         }
         settings_collection.insert_one(default)
         return default
     
     # Memastikan key baru selalu ter-inisialisasi otomatis jika belum ada di DB
     updated = False
-    for key in ["allow_dashboard", "allow_manage_data", "allow_guestbook", "allow_profile"]:
+    for key in ["allow_dashboard", "allow_manage_data", "allow_guestbook", "allow_profile", "allow_all_invitations"]:
         if key not in settings:
-            settings[key] = True
+            settings[key] = True if key != "allow_all_invitations" else True
             updated = True
     if updated:
         settings_collection.update_one({"type": "global_config"}, {"$set": settings})
@@ -250,7 +247,7 @@ def login():
                 "email": user['email'],
                 "role": user['role']
             }
-            flash(f"Welcome back, {user['username']}!", "success")
+            flash(f"Logged in successfully!", "success")
             return redirect(url_for('dashboard'))
         else:
             flash("Invalid email or password.", "danger")
@@ -270,16 +267,18 @@ def dashboard():
     # Jika ditutup, hanya role superadmin yang tetap bisa akses
     if not settings.get('allow_dashboard', True) and session['user']['role'] != 'superadmin':
         flash("Halaman Dashboard saat ini sedang ditutup oleh Superadmin.", "danger")
-        return redirect(url_for('logout')) # atau return redirect ke halaman lain yang diizinkan
-        
-    return render_template('dashboard.html', user=session['user'])
+        return redirect(url_for('logout'))
+    
+    invitations = list(invitations_collection.find())
+
+    return render_template('dashboard.html', user=session['user'], invitations=invitations)
 
 @app.route('/manage', methods=['GET', 'POST'])
 @login_required
 @roles_required('superadmin', 'admin', 'usher')
 def manage_data():
     settings = get_global_settings()
-    # Jika ditutup, hanya role superadmin yang tetap bisa akses
+    # If closed, only the superadmin role can still access it.
     if not settings.get('allow_manage_data', True) and session['user']['role'] != 'superadmin':
         flash("Halaman Pengelolaan Data saat ini sedang ditutup oleh Superadmin.", "danger")
         return redirect(url_for('dashboard'))
@@ -290,7 +289,7 @@ def manage_data():
     if request.method == 'POST':
         form_type = request.form.get('form_type')
         
-        # A. FITUR CREATE EVENT
+        # Create Event Feature
         if form_type == 'create_event':
             event_name = request.form.get('event_name')
             event_date = request.form.get('event_date')
@@ -312,7 +311,7 @@ def manage_data():
             flash("Event created successfully!", "success")
             return redirect(url_for('manage_data'))
             
-        # B. FITUR CREATE INVITATION (Tambahkan status is_active: True saat generate)
+        # Create Invitation Feature
         elif form_type == 'create_invitation':
             if current_role not in ['superadmin', 'admin']:
                 flash("Unauthorized.", "danger")
@@ -334,7 +333,7 @@ def manage_data():
                     "date": selected_event['event_date'],
                     "guest_name": guest_name,
                     "status": "Active",
-                    "is_active": True, # FITUR BARU: Default aktif saat dibuat
+                    "is_active": True,
                     "created_by": username
                 })
                 flash("Invitation generated successfully!", "success")
@@ -343,14 +342,13 @@ def manage_data():
                 
             return redirect(url_for('manage_data'))
         
-        # C. FITUR EDIT EVENT (PROSES FAVICON LANGSUNG SETELAH UPLOAD LOGO)
+        # Edit Event Feature
         elif form_type == 'edit_event':
             event_id = request.form.get('event_id')
             new_name = request.form.get('event_name')
             new_date = request.form.get('event_date')
             new_time = request.form.get('event_time')
             new_location = request.form.get('event_location')
-            new_status = request.form.get('status')
             
             current_event = events_collection.find_one({"_id": ObjectId(event_id)})
             final_logo = current_event.get('event_logo', '🎉') if current_event else '🎉'
@@ -364,7 +362,6 @@ def manage_data():
                     
                     file.save(destination_path)
                     final_logo = f"/{UPLOAD_FOLDER}/{filename}"
-                    # Proses pemindahan langsung ke static/favicon.ico dihapus di sini
             
             update_data = {
                 "event_name": new_name,
@@ -373,9 +370,6 @@ def manage_data():
                 "event_location": new_location,
                 "event_logo": final_logo
             }
-            
-            if new_status:
-                update_data["status"] = new_status
 
             events_collection.update_one({"_id": ObjectId(event_id)}, {"$set": update_data})
             invitations_collection.update_many(
@@ -385,27 +379,22 @@ def manage_data():
             flash("Event updated successfully!", "success")
             return redirect(url_for('manage_data'))
 
-        # D. FITUR EDIT INVITATION
+        # Edit Invitation Feature
         elif form_type == 'edit_invitation':
             invite_id = request.form.get('invite_id')
-            # Ambil nilai status link dari form (jika dicentang berarti True, jika tidak berarti False)
-            link_status = True if request.form.get('is_active') else False
-            
+
             invitations_collection.update_one(
                 {"_id": ObjectId(invite_id)},
                 {"$set": {
                     "guest_name": request.form.get('guest_name'),
-                    "status": request.form.get('status'),
-                    "is_active": link_status # FITUR BARU: Update status keaktifan link
+                    "domicile": request.form.get('domicile'),
+                    "phone_number": request.form.get('phone_number')
                 }}
             )
             flash("Invitation record updated successfully!", "success")
             return redirect(url_for('manage_data'))
 
-    # ==========================================
-    # READ DATA UNTUK DITAMPILKAN DI HALAMAN
-    # ==========================================
-    # Menampilkan semua event untuk superadmin maupun admin
+    # Read Data to Display on Page
     if current_role in ['superadmin', 'admin']:
         all_events = list(events_collection.find())
         dropdown_events = list(events_collection.find({"status": "Approved"}))
@@ -417,27 +406,12 @@ def manage_data():
         invitations = list(invitations_collection.find({"event_id": {"$in": admin_event_ids}}))
 
     for invite in invitations:
-        rsvp_data = rsvps_collection.find_one({"invitation_id": invite['_id']})
-        rsvp_status = rsvp_data.get('attendance') if rsvp_data else None
+        rsvp_status = invite.get('status')
         
-        if rsvp_status in ['Akan Hadir', 'Tidak akan hadir']:
-            invite['display_status'] = rsvp_status
-        elif invite.get('status') == 'Pending Deletion':
-            invite['display_status'] = 'Pending Deletion'
-        # Tambahan indikator visual jika link dinonaktifkan
-        elif not invite.get('is_active', True):
-            invite['display_status'] = 'Pasif / Nonaktif'
-        else:
-            invite['display_status'] = 'Active'
-        
-        if rsvp_data:
-            invite['rsvp'] = rsvp_status
-            invite['total_guests'] = rsvp_data.get('total_guests', 1)
-            invite['wishes'] = rsvp_data.get('wishes', '')
-        else:
-            invite['rsvp'] = None
-            invite['total_guests'] = 0
-            invite['wishes'] = None
+        # Mapping key agar template HTML lama tidak error/patah
+        invite['rsvp'] = rsvp_status
+        invite['total_guests'] = invite.get('total_guests', 0)
+        invite['wishes'] = invite.get('wishes', None)
             
     return render_template('manage_data.html', events=all_events, approved_events=dropdown_events, invitations=invitations, role=current_role)
 
@@ -474,7 +448,7 @@ def reject_delete_event(id):
         {"_id": ObjectId(id)},
         {"$set": {"status": "Approved"}, "$unset": {"requested_by": ""}}
     )
-    flash("Permintaan hapus acara ditolak. Acara tetap aktif.", "success")
+    flash("The event delete request was denied. The event remains active.", "success")
     return redirect(url_for('manage_data'))
 
 @app.route('/delete-event/<id>')
@@ -484,18 +458,37 @@ def delete_event(id):
     event_oid = ObjectId(id)
     invitations_collection.delete_many({"event_id": event_oid})
     events_collection.delete_one({"_id": event_oid})
-    flash("Acara dan daftar undangan berhasil dihapus permanen.", "success")
+    flash("The event and invite list have been successfully deleted permanently.", "success")
     return redirect(url_for('manage_data'))
 
 @app.route('/reject-delete/<id>')
 @login_required
 @roles_required('superadmin')
 def reject_delete(id):
+    invitation_oid = ObjectId(id)
+    invite = invitations_collection.find_one({"_id": invitation_oid})
+    
+    # Ambil status saat ini yang tersimpan di DB sebagai cadangan utama
+    current_status = invite.get('status', 'Active') if invite else 'Active'
+    
+    # Jika sistem menyimpan status lama di 'previous_status', gunakan itu.
+    # Jika tidak ada, gunakan 'current_status' (agar tetap 'Will be attend' / 'Will not be attend')
+    # dan hindari pemaksaan merubah string menjadi 'Active' secara sepihak.
+    prev_status = invite.get('previous_status', current_status)
+
+    # Validasi tambahan: Jika status terlanjur rusak/kehilangan jejak, 
+    # pastikan status dikembalikan ke status RSVP riil yang ada, bukan reset status admin.
+    if prev_status in ['Pending Deletion', 'non-active']:
+        prev_status = current_status
+
     invitations_collection.update_one(
-        {"_id": ObjectId(id)},
-        {"$set": {"status": "Active"}, "$unset": {"requested_by": ""}}
+        {"_id": invitation_oid},
+        {
+            "$set": {"status": prev_status}, 
+            "$unset": {"requested_by": "", "previous_status": ""}  # Bersihkan field temporary
+        }
     )
-    flash("Deletion request rejected. Invitation is now active.", "success")
+    flash("Delete request denied. Invitation RSVP status restored successfully.", "success")
     return redirect(url_for('manage_data'))
 
 @app.route('/delete/<id>')
@@ -516,7 +509,7 @@ def request_delete_event(id):
         {"_id": ObjectId(id)},
         {"$set": {"status": "Pending Deletion", "requested_by": session['user']['username']}}
     )
-    flash("Permintaan hapus acara telah dikirim ke Superadmin.", "success")
+    flash("An event delete request has been sent to the Superadmin.", "success")
     return redirect(url_for('manage_data'))
 
 @app.route('/cancel-event-proposal/<id>')
@@ -543,7 +536,7 @@ def cancel_delete_event_request(id):
         {"_id": ObjectId(id), "status": "Pending Deletion"},
         {"$set": {"status": "Approved"}, "$unset": {"requested_by": ""}}
     )
-    flash("Permintaan hapus acara berhasil dibatalkan.", "success")
+    flash("The event delete request was successfully cancelled.", "success")
     return redirect(url_for('manage_data'))
 
 @app.route('/request-delete/<id>')
@@ -551,18 +544,28 @@ def cancel_delete_event_request(id):
 @roles_required('admin')
 def request_delete(id):
     invitation_oid = ObjectId(id)
-    username = session['user']['username']
     invite = invitations_collection.find_one({"_id": invitation_oid})
-    if not invite:
+    
+    if invite:
+        current_status = invite.get('status', 'Active')
+        # HANYA simpan status lama jika status saat ini bukan 'Pending Deletion'
+        if current_status != 'Pending Deletion':
+            invitations_collection.update_one(
+                {"_id": invitation_oid},
+                {
+                    "$set": {
+                        "status": "Pending Deletion",
+                        "previous_status": current_status,  # <-- Amankan status RSVP asli di sini
+                        "requested_by": session['user']['username']
+                    }
+                }
+            )
+            flash("Permintaan hapus undangan telah dikirim ke Superadmin.", "success")
+        else:
+            flash("Undangan sudah dalam status antrean hapus.", "warning")
+    else:
         flash("Undangan tidak ditemukan.", "danger")
-        return redirect(url_for('manage_data'))
         
-    # Sederhanakan pengecekan: Jika dia seorang admin, dia berhak meminta hapus tamu
-    invitations_collection.update_one(
-        {"_id": invitation_oid},
-        {"$set": {"status": "Pending Deletion", "requested_by": username}}
-    )
-    flash("Permintaan hapus undangan telah dikirim.", "success")
     return redirect(url_for('manage_data'))
 
 @app.route('/cancel-delete-request/<id>')
@@ -573,24 +576,29 @@ def cancel_delete_request(id):
     username = session['user']['username']
     invite = invitations_collection.find_one({"_id": invitation_oid})
     if not invite:
-        flash("Undangan tidak ditemukan.", "danger")
+        flash("Invitation not found.", "danger")
         return redirect(url_for('manage_data'))
+        
+    # Panggil kembali status sebelumnya, default ke 'Active' jika tidak ditemukan
+    prev_status = invite.get('previous_status', 'Active')
         
     invitations_collection.update_one(
         {"_id": invitation_oid},
-        {"$set": {"status": "Active"}, "$unset": {"requested_by": ""}}
+        {
+            "$set": {"status": prev_status}, 
+            "$unset": {"requested_by": "", "previous_status": ""}
+        }
     )
-    flash("Permintaan hapus undangan berhasil dibatalkan.", "success")
+    flash("The delete invitation request was successfully cancelled.", "success")
     return redirect(url_for('manage_data'))
 
 # --- ROUTE TAMBAHAN UNTUK BUKU TAMU USHER ---
 
-@app.route('/usher/guestbook', methods=['GET'])
+@app.route('/guestbook', methods=['GET'])
 @login_required
 @roles_required('superadmin', 'usher')
-def usher_guestbook():
+def guestbook():
     settings = get_global_settings()
-    # Jika ditutup, hanya role superadmin yang tetap bisa akses
     if not settings.get('allow_guestbook', True) and session['user']['role'] != 'superadmin':
         flash("Halaman Buku Tamu saat ini sedang ditutup oleh Superadmin.", "danger")
         return redirect(url_for('dashboard'))
@@ -618,12 +626,13 @@ def usher_guestbook():
 
     attended_guests = []
     if has_permission and selected_event_id:
-        attended_guests = list(rsvps_collection.find({
-            "attendance": "Hadir", # <--- UBAH JUGA DI SINI SUPAYA DAFTAR TAMU "Hadir" BISA MUNCUL
+        # Mengambil dari koleksi invitations
+        attended_guests = list(invitations_collection.find({
+            "status": "Attend",
             "event_id": ObjectId(selected_event_id)
         }).sort("submitted_at", -1))
         
-    return render_template('usher_guestbook.html', attended_guests=attended_guests, allowed_events=allowed_events, selected_event_id=selected_event_id, has_permission=has_permission)
+    return render_template('guestbook.html', attended_guests=attended_guests, allowed_events=allowed_events, selected_event_id=selected_event_id, has_permission=has_permission)
 
 @app.route('/usher/check-in/<id>', methods=['POST'])
 @login_required
@@ -643,7 +652,6 @@ def usher_check_in(id):
         event_id = invitation.get('event_id')
         event_oid = ObjectId(event_id) if isinstance(event_id, str) else event_id
 
-        # VALIDASI KETAT: Cek apakah Usher memiliki izin untuk event dari undangan ini
         if session['user']['role'] == 'usher':
             usher_data = users_collection.find_one({"_id": ObjectId(session['user']['id'])})
             allowed_events = usher_data.get('allowed_events', [])
@@ -653,30 +661,65 @@ def usher_check_in(id):
                     "message": "Anda tidak memiliki izin dari Superadmin untuk mengelola buku tamu di acara ini!"
                 }), 403
 
-        rsvps_collection.update_one(
-            {"invitation_id": invitation_oid},
+        # Update status kehadiran langsung ke koleksi invitations
+        invitations_collection.update_one(
+            {"_id": invitation_oid},
             {
                 "$set": {
-                    "invitation_id": invitation_oid,
-                    "event_id": event_oid,
-                    "guest_name": guest_name,
-                    "attendance": "Hadir",
-                    "total_guests": 1,
+                    "status": "Attend",
                     "submitted_at": datetime.datetime.now()
                 }
-            },
-            upsert=True
+            }
         )
 
         return jsonify({
             "status": "success", 
-            "message": f"Berhasil! Kehadiran atas nama '{guest_name}' telah dicatat."
+            "message": f"Success! Attendance under the name '{guest_name}' has been recorded."
         })
         
     except Exception as e:
         return jsonify({"status": "error", "message": f"Terjadi kesalahan sistem: {str(e)}"}), 500
 
-@app.route('/superadmin/manage-people', methods=['GET', 'POST'])
+@app.route('/usher/search-guest', methods=['GET'])
+@login_required
+@roles_required('superadmin', 'usher')
+def usher_search_guest():
+    try:
+        event_id = request.args.get('event_id')
+        search_query = request.args.get('q', '').strip()
+        
+        if not event_id:
+            return jsonify({"status": "error", "message": "Event ID diperlukan."}), 400
+
+        # Proteksi Hak Akses untuk Usher
+        if session['user']['role'] == 'usher':
+            usher_data = users_collection.find_one({"_id": ObjectId(session['user']['id'])})
+            allowed_events = usher_data.get('allowed_events', [])
+            if event_id not in allowed_events:
+                return jsonify({"status": "error", "message": "Akses ditolak."}), 403
+
+        # Query pencarian nama tamu yang belum hadir pada event tersebut
+        query = {
+            "event_id": ObjectId(event_id),
+            "status": {"$ne": "Attend"},
+            "guest_name": {"$regex": search_query, "$options": "i"} # Case-insensitive search
+        }
+        
+        guests = list(invitations_collection.find(query).limit(10)) # Batasi 10 hasil demi performa
+        
+        results = []
+        for g in guests:
+            results.append({
+                "id": str(g['_id']),
+                "guest_name": g.get('guest_name', 'Tamu Undangan')
+            })
+            
+        return jsonify({"status": "success", "data": results})
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/manage-people', methods=['GET', 'POST'])
 @login_required
 def manage_people():
     if session['user']['role'] != 'superadmin':
@@ -725,7 +768,8 @@ def manage_people():
             allow_dash = True if request.form.get('allow_dashboard') else False
             allow_manage = True if request.form.get('allow_manage_data') else False
             allow_gbook = True if request.form.get('allow_guestbook') else False
-            allow_prof = True if request.form.get('allow_profile') else False # Ambil value checkbox profile
+            allow_prof = True if request.form.get('allow_profile') else False
+            allow_all_inv = True if request.form.get('allow_all_invitations') else False
             
             db.settings.update_one(
                 {"type": "global_config"}, 
@@ -735,11 +779,60 @@ def manage_people():
                     "allow_dashboard": allow_dash,
                     "allow_manage_data": allow_manage,
                     "allow_guestbook": allow_gbook,
-                    "allow_profile": allow_prof # Simpan konfigurasi baru ke DB
+                    "allow_profile": allow_prof,
+                    "allow_all_invitations": allow_all_inv
                 }}, 
                 upsert=True
             )
-            flash("Pengaturan akses halaman berhasil diperbarui!", "success")
+
+            if not allow_all_inv:
+                # 1. Nonaktifkan tautan secara sistem (is_active: False) untuk SEMUA undangan
+                invitations_collection.update_many(
+                    {},
+                    {"$set": {"is_active": False}}
+                )
+                
+                # 2. Hanya ubah status undangan yang BELUM di-RSVP (misal: "Active" / kosong) menjadi "Non-active".
+                # Pengecualian ditambahkan untuk status: "Attend", "Will be attend", dan "Will not be attend".
+                invitations_collection.update_many(
+                    {
+                        "status": {"$nin": ["Attend", "Will be attend", "Will not be attend", "Non-active"]}
+                    },
+                    [
+                        {"$set": {
+                            "previous_status": "$status",
+                            "status": "Non-active"
+                        }}
+                    ]
+                )
+                flash("Global settings are disabled. All individual invite links are automatically disabled!", "success")
+            else:
+                # Saat diaktifkan kembali:
+                # 1. Aktifkan kembali tautan secara sistem (is_active: True) untuk semua undangan
+                invitations_collection.update_many(
+                    {},
+                    {"$set": {"is_active": True}}
+                )
+                
+                # 2. Kembalikan status asli dari 'previous_status' jika ada, 
+                # jika tidak ada maka berikan status 'Active'
+                invitations_collection.update_many(
+                    {"status": "Non-active"},
+                    [
+                        {"$set": {
+                            "status": {
+                                "$cond": {
+                                    "if": {"$and": [{"$ifNull": ["$previous_status", False]}, {"$ne": ["$previous_status", "Non-active"]}]},
+                                    "then": "$previous_status",
+                                    "else": "Active"
+                                }
+                            }
+                        }},
+                        {"$unset": ["previous_status"]}  # Hapus field temporary setelah berhasil dikembalikan
+                    ]
+                )
+                flash("Access settings updated successfully!", "success")
+
             return redirect(url_for('manage_people'))
 
         # -------------------------------------------------------------
@@ -795,7 +888,7 @@ def manage_people():
         role=session['user']['role']
     )
 
-@app.route('/superadmin/delete-user/<user_id>')
+@app.route('/manage-people/delete-user/<user_id>')
 @login_required
 def delete_user(user_id):
     if session['user']['role'] != 'superadmin':

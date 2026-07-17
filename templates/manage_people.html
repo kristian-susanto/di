@@ -15,7 +15,7 @@
             <div class="card shadow-sm border-0 bg-white">
                 <div class="card-header bg-dark text-white fw-bold py-3">Pengaturan Akses Halaman</div>
                 <div class="card-body">
-                    <form action="/superadmin/manage-people" method="POST">
+                    <form action="/manage-people" method="POST">
                         <input type="hidden" name="form_type" value="toggle_gate">
                         
                         <div class="form-check form-switch mb-2">
@@ -45,7 +45,14 @@
                             <label class="form-check-label fw-semibold" for="manageSwitch">Buka Akses Manage Data</label>
                         </div>
 
-                        <!-- FITUR BARU: Switch Buku Tamu -->
+                        <div class="form-check form-switch mb-4 p-2 bg-light rounded border border-danger">
+                            <input class="form-check-input ms-0 me-2" type="checkbox" name="allow_all_invitations" id="allInvitations" {% if settings.allow_all_invitations %}checked{% endif %}>
+                            <label class="form-check-label fw-bold text-danger" for="allInvitations">Aktifkan Semua Undangan</label>
+                            <div class="form-text text-muted small mt-1" style="font-size: 0.75rem;">
+                                Jika dinonaktifkan, semua tautan undangan tamu tidak akan bisa diakses/dibuka (berlaku global).
+                            </div>
+                        </div>
+
                         <div class="form-check form-switch mb-4">
                             <input class="form-check-input" type="checkbox" name="allow_guestbook" id="gbookSwitch" {% if settings.allow_guestbook %}checked{% endif %}>
                             <label class="form-check-label fw-semibold" for="gbookSwitch">Buka Akses Buku Tamu</label>
@@ -90,7 +97,7 @@
                                             </button>
                                             {% endif %}
                                             
-                                            <button type="button" class="btn btn-sm btn-outline-danger fw-semibold btn-delete-user" data-url="/superadmin/delete-user/{{ u._id }}" data-username="{{ u.username }}">
+                                            <button type="button" class="btn btn-sm btn-outline-danger fw-semibold btn-delete-user" data-url="/manage-people/delete-user/{{ u._id }}" data-username="{{ u.username }}">
                                                 Hapus
                                             </button>
                                         </div>
@@ -114,7 +121,7 @@
                 <h5 class="modal-title fw-bold" id="addUserModalLabel">Buat Pengguna Baru</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="/superadmin/manage-people" method="POST">
+            <form action="/manage-people" method="POST">
                 <input type="hidden" name="form_type" value="add_user">
                 
                 <div class="modal-body text-start">
@@ -226,7 +233,7 @@
                     <h5 class="modal-title fw-bold" id="editUserModalLabel-{{ u._id }}">📝 Edit Pengguna: {{ u.username }}</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form action="/superadmin/manage-people" method="POST">
+                <form action="/manage-people" method="POST">
                     <input type="hidden" name="form_type" value="edit_user_unified">
                     <input type="hidden" name="user_id" value="{{ u._id }}">
                     
@@ -308,14 +315,13 @@
                 const username = this.getAttribute("data-username");
 
                 Swal.fire({
-                    title: 'Apakah Anda yakin?',
-                    text: `Pengguna "${username}" akan dihapus secara permanen dari sistem!`,
+                    title: 'Are you sure?',
+                    text: `User "${username}" will be permanently deleted from the system!`,
                     icon: 'warning',
+                    showCloseButton: true,
                     showCancelButton: true,
                     confirmButtonColor: '#dc3545',
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: 'Ya, Hapus!',
-                    cancelButtonText: 'Batal'
+                    cancelButtonColor: '#6c757d'
                 }).then((result) => {
                     if (result.isConfirmed) {
                         window.location.href = targetUrl;

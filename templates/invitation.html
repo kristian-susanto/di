@@ -383,20 +383,31 @@
               </div>
 
               <div class="mb-3 text-start">
-                <label class="form-label small fw-bold">Konfirmasi</label>
-                <select name="attendance" class="form-select" required>
-                  <option value="" disabled {% if not current_rsvp %}selected{% endif %}>Apakah Anda akan hadir?</option>
-                  <option value="Akan Hadir" {% if current_rsvp and current_rsvp.attendance == 'Akan Hadir' %}selected{% endif %}>✅ Ya, Saya Akan Hadir</option>
-                  <option value="Tidak akan hadir" {% if current_rsvp and current_rsvp.attendance == 'Tidak akan hadir' %}selected{% endif %}>❌ Maaf, Saya Berhalangan Hadir</option>
+                <label class="form-label small fw-bold">Confirmation of Attendance</label>
+                
+                <!-- Jika sudah Attend, kita buat select ini DISABLED agar tidak bisa dipencet -->
+                <select name="status" class="form-select" required {% if current_rsvp and current_rsvp.status == 'Attend' %}disabled{% endif %}>
+                  {% if current_rsvp and current_rsvp.status == 'Attend' %}
+                    <option value="Attend" selected>✅ You have attended</option>
+                  {% else %}
+                    <option value="" disabled selected>Will you be attending?</option>
+                  {% endif %}
+                  <option value="Will be attend" {% if current_rsvp and current_rsvp.status == 'Will be attend' %}selected{% endif %}>✅ Yes, I Will Attend</option>
+                  <option value="Will not be attend" {% if current_rsvp and current_rsvp.status == 'Will not be attend' %}selected{% endif %}>❌ Sorry, I Can't Attend</option>
                 </select>
+
+                <!-- Input cadangan tersembunyi agar nilai 'Attend' tetap terkirim ke server saat submit -->
+                {% if current_rsvp and current_rsvp.status == 'Attend' %}
+                  <input type="hidden" name="status" value="Attend">
+                {% endif %}
               </div>
 
-              <div class="mb-4 text-start">
-                <label class="form-label small fw-bold">Jumlah Orang</label>
-                <input type="number" name="total_guests" class="form-control" min="1" value="{{ current_rsvp.total_guests if (current_rsvp and current_rsvp.total_guests) else 1 }}" required>
+              <div class="mb-3 text-start">
+                <label class="form-label small fw-bold">Number of People</label>
+                <input type="number" name="total_guests" class="form-control" min="1" value="{{ current_rsvp.total_guests if (current_rsvp and current_rsvp.total_guests) else 1 }}" required {% if current_rsvp and current_rsvp.status == 'Attend' %}readonly{% endif %}>
               </div>
 
-              <button type="submit" class="btn btn-dark w-100 py-2 fw-bold" style="border-radius: 8px;">Kirim Konfirmasi Kehadiran</button>
+              <button type="submit" class="btn btn-dark w-100 py-2 fw-bold" style="border-radius: 8px;">Send Attendance Confirmation</button>
             </form>
           </div>
         </div>
