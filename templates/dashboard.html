@@ -1,27 +1,154 @@
-{% extends 'base.html' %} {% block content %}
-<div class="card p-4 shadow-sm">
-  <h2>Welcome to Dashboard, {{ user.username }}!</h2>
-  <p class="text-muted">
-    You are logged in as an <strong>{{ user.role | upper }}</strong>.
-  </p>
-  <hr />
-  <div class="row g-3">
-    <div class="col-md-4">
-      <div class="p-3 bg-primary text-white rounded">
-        <h5>Your Profile</h5>
-        <p class="mb-0">{{ user.email }}</p>
+{% extends 'base.html' %} 
+{% block content %}
+<div class="container my-2">
+  
+  <!-- KARTU SAMBUTAN UTAMA -->
+  <div class="card p-4 shadow-sm border-0 bg-white mb-4 animate__animated animate__fadeIn">
+    <h2>Welcome to Dashboard, {{ user.username }}!</h2>
+    <p class="text-muted mb-0">
+      You are logged in as an <span class="badge bg-dark px-2.5 py-1.5">{{ user.role | upper }}</span>.
+    </p>
+    <hr class="my-3"/>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="p-3 bg-light border rounded">
+          <span class="text-secondary small d-block fw-semibold mb-1"><i class="bi bi-envelope-at me-1"></i> Registered Email</span>
+          <strong class="text-dark">{{ user.email }}</strong>
+        </div>
       </div>
+      {% if user.role == 'superadmin' %}
+      <div class="col-md-6">
+        <div class="p-3 bg-danger-subtle text-danger border border-danger-subtle rounded h-100 d-flex align-items-center">
+          <p class="mb-0 small fw-medium">
+            <i class="bi bi-shield-lock-fill me-1"></i> <strong>Superadmin Authority:</strong> You hold full configuration access and destruction power over all records.
+          </p>
+        </div>
+      </div>
+      {% endif %}
     </div>
-    {% if user.role == 'superadmin' %}
-    <div class="col-md-8">
-      <div class="p-3 bg-danger text-white rounded">
-        <h5>Superadmin Notice</h5>
-        <p class="mb-0">
-          You have full destruction powers (Delete invitation records).
-        </p>
+  </div>
+
+  <!-- SEKTOR METRICS UTAMA ACARA & TAMU -->
+  <div class="row g-4">
+    
+    <!-- Bagian Kiri: Dropdown Filter Acara (Khusus Superadmin, Admin, Usher) -->
+    {% if user.role in ['superadmin', 'admin', 'usher'] %}
+    <div class="col-lg-4 col-md-12">
+      <div class="card shadow-sm border-0 bg-white h-100">
+        <div class="card-header bg-dark text-white fw-bold py-3">
+          <i class="bi bi-funnel-fill me-2"></i>Filter Metrics by Event
+        </div>
+        <div class="card-body">
+          <p class="text-muted small">Silakan pilih acara terlebih dahulu untuk melihat grafik jumlah tamu Attend dan rincian Not Attend:</p>
+          
+          <form method="GET" action="{{ url_for('dashboard') }}" id="filterEventForm">
+            <div class="mb-3">
+              <select name="event_id" class="form-select shadow-none" onchange="document.getElementById('filterEventForm').submit();" required>
+                <option value="" disabled {% if not selected_event_id %}selected{% endif %}>-- Choose Event --</option>
+                {% for evt in allowed_events %}
+                  <option value="{{ evt._id }}" {% if selected_event_id == (evt._id | string) %}selected{% endif %}>
+                    {{ evt.event_name }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          </form>
+
+          {% if not selected_event_id %}
+            <div class="alert alert-warning py-2 mb-0 text-center" style="font-size: 0.85rem;">
+              <i class="bi bi-exclamation-triangle me-1"></i> Data status tamu belum muncul sebelum acara dipilih.
+            </div>
+          {% else %}
+            <div class="alert alert-success py-2 mb-0 text-center" style="font-size: 0.85rem;">
+              <i class="bi bi-check-circle me-1"></i> Menampilkan data acara terpilih.
+            </div>
+          {% endif %}
+        </div>
       </div>
     </div>
     {% endif %}
+
+    <!-- Bagian Kanan / Penuh: Ringkasan Angka Box Digital Card -->
+    <div class="{% if user.role in ['superadmin', 'admin', 'usher'] %}col-lg-8 col-md-12{% else %}col-12{% endif %}">
+      <div class="row g-3">
+        
+        <!-- CARD 1: Jumlah Acara yang Tersedia -->
+        <div class="col-md-4 col-sm-12">
+          <div class="card border-0 shadow-sm bg-primary text-white p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between">
+              <div>
+                <span class="small text-white-50 text-uppercase fw-bold tracking-wider">Events Available</span>
+                <h2 class="display-5 fw-bold mb-0 mt-1">{{ total_events }}</h2>
+              </div>
+              <div class="fs-1 text-white-50"><i class="bi bi-calendar-check"></i></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD 2: Jumlah Tamu Status Attend -->
+        <div class="col-md-4 col-sm-6">
+          <div class="card border-0 shadow-sm bg-success text-white p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between">
+              <div>
+                <span class="small text-white-50 text-uppercase fw-bold tracking-wider">Guests Attend</span>
+                <h2 class="display-5 fw-bold mb-0 mt-1">{{ attend_count }}</h2>
+              </div>
+              <div class="fs-1 text-white-50"><i class="bi bi-person-check"></i></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD 3: Jumlah Tamu Status Not Attend -->
+        <div class="col-md-4 col-sm-6">
+          <div class="card border-0 shadow-sm bg-secondary text-white p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between">
+              <div>
+                <span class="small text-white-50 text-uppercase fw-bold tracking-wider">Guests Not Attend</span>
+                <h2 class="display-5 fw-bold mb-0 mt-1">{{ not_attend_details.total }}</h2>
+              </div>
+              <div class="fs-1 text-white-50"><i class="bi bi-person-x"></i></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- KARTU RINCIAN NOT ATTEND (Khusus Superadmin, Admin, Usher jika sudah memilih Event) -->
+      {% if user.role in ['superadmin', 'admin', 'usher'] and selected_event_id %}
+      <div class="card border-0 shadow-sm bg-white p-4 mt-3 animate__animated animate__fadeInUp">
+        <h5 class="fw-bold text-dark mb-3"><i class="bi bi-bar-chart-steps text-info me-2"></i>Rincian Status Tamu (Not Attend Breakdown)</h5>
+        
+        <div class="row g-3 text-center">
+          <div class="col-md-3 col-6">
+            <div class="border rounded p-2.5 bg-light">
+              <span class="text-muted small d-block">Active</span>
+              <h4 class="fw-bold text-info mb-0">{{ not_attend_details.active }}</h4>
+            </div>
+          </div>
+          <div class="col-md-3 col-6">
+            <div class="border rounded p-2.5 bg-light">
+              <span class="text-muted small d-block">Non-Active</span>
+              <h4 class="fw-bold text-danger mb-0">{{ not_attend_details.non_active }}</h4>
+            </div>
+          </div>
+          <div class="col-md-3 col-6">
+            <div class="border rounded p-2.5 bg-light">
+              <span class="text-muted small d-block">Will Be Attend</span>
+              <h4 class="fw-bold text-success mb-0">{{ not_attend_details.will_attend }}</h4>
+            </div>
+          </div>
+          <div class="col-md-3 col-6">
+            <div class="border rounded p-2.5 bg-light">
+              <span class="text-muted small d-block">Will Not Attend</span>
+              <h4 class="fw-bold text-warning mb-0">{{ not_attend_details.will_not_attend }}</h4>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
   </div>
+
 </div>
 {% endblock %}

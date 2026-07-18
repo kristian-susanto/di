@@ -39,6 +39,10 @@
       .dropdown-toggle-nocaret::after {
         display: none !important;
       }
+      table.dataTable thead th {
+          text-align: center !important;
+          vertical-align: middle !important;
+      }
     </style>
   </head>
   <body class="bg-light">
@@ -79,7 +83,7 @@
                   </a>
                 </li>
 
-                {% if session['user']['role'] in ['superadmin', 'admin', 'usher'] %}
+                {% if session['user']['role'] in ['superadmin', 'admin'] %}
                 <li><a class="dropdown-item py-2" href="{{ url_for('manage_data') }}"><i class="bi bi-database-gear me-2"></i> Manage Data</a></li>
                 {% endif %}
 
@@ -93,7 +97,6 @@
 
                 <li><hr class="dropdown-divider my-0"></li>
                 <li>
-                  <!-- Tambahkan spasi manual &nbsp; atau bungkus emoji logout dengan span bermargin jika perlu -->
                   <a class="dropdown-item py-2 fw-bold" href="#" id="btnLogoutLink"><i class="bi bi-box-arrow-right me-2"></i> Logout</a>
                 </li>
               </ul>

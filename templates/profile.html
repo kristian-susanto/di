@@ -13,26 +13,23 @@
             </div>
 
             <form id="profileForm" action="{{ url_for('profile') }}" method="POST">
-                <!-- Username -->
                 <div class="mb-3 text-start">
                     <label class="form-label">Username</label>
-                    <input type="text" name="username" id="username" class="form-control" value="superadminaja">
+                    <input type="text" name="username" id="username" class="form-control" value="superadminaja" placeholder="Enter username">
                 </div>
 
-                <!-- Email Address -->
                 <div class="mb-3 text-start">
                     <label class="form-label">Email Address</label>
-                    <input type="email" name="email" id="email" class="form-control" value="superadmin@gmail.com">
+                    <input type="email" name="email" id="email" class="form-control" value="superadmin@gmail.com" placeholder="Enter email address">
                 </div>
 
-                <!-- New Password -->
                 <div class="mb-3 text-start">
                     <label class="form-label">New Password (Leave blank if you don't want to change it)</label>
                     <div class="input-group">
-                    <input type="password" name="password" id="password" class="form-control">
-                    <button class="btn btn-outline-secondary" type="button" id="togglePassword">
-                        <i class="bi bi-eye-slash" id="toggleIcon"></i>
-                    </button>
+                        <input type="password" name="password" id="password" class="form-control" placeholder="Enter password">
+                        <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                            <i class="bi bi-eye-slash" id="toggleIcon"></i>
+                        </button>
                     </div>
                 </div>
 
@@ -58,34 +55,34 @@
         const toggleIcon = document.getElementById('toggleIcon');
         const profileForm = document.getElementById('profileForm');
 
-        // 1. Logika Toggle Visibility Password
+        // 1. Password Visibility Toggle Logic
         togglePasswordBtn.addEventListener('click', function () {
-            // Cek tipe input saat ini
+            // Check current input type
             const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
             passwordInput.setAttribute('type', type);
             
-            // Ganti ikon mata (buka / tutup)
+            // Change eye icon (open/close)
             toggleIcon.classList.toggle('bi-eye');
             toggleIcon.classList.toggle('bi-eye-slash');
         });
 
-        // 2. Logika SweetAlert Konfirmasi Pilihan
+        // 2. SweetAlert Confirm Selection Logic
         profileForm.addEventListener('submit', function (e) {
-            // Hentikan form submit otomatis terlebih dahulu
+            // Stop the auto-submit form first
             e.preventDefault();
 
             Swal.fire({
-            title: 'Are you sure?',
-            text: "Your profile data will be updated!",
-            icon: 'warning',
-            showCloseButton: true,
-            showCancelButton: true,
-            confirmButtonColor: '#0d6efd',
-            cancelButtonColor: '#6c757d'
+                title: 'Are you sure?',
+                text: "Your profile data will be updated!",
+                icon: 'warning',
+                showCloseButton: true,
+                showCancelButton: true,
+                confirmButtonColor: '#0d6efd',
+                cancelButtonColor: '#6c757d'
             }).then((result) => {
-            if (result.isConfirmed) {
-                profileForm.submit();
-            }
+                if (result.isConfirmed) {
+                    profileForm.submit();
+                }
             });
         });
     });
@@ -109,7 +106,7 @@
                     }
                 });
 
-                // Kirim request ke backend untuk menghapus data menggunakan Fetch API
+                // Send a request to the backend to delete data using the Fetch API
                 fetch("{{ url_for('delete_account') }}", {
                     method: 'POST',
                     headers: {
@@ -125,7 +122,7 @@
                             text: data.message,
                             confirmButtonText: 'OK'
                         }).then(() => {
-                            // Arahkan kembali ke halaman login setelah berhasil dihapus
+                            // Redirect to login page after successful deletion
                             window.location.href = "{{ url_for('login') }}";
                         });
                     } else {

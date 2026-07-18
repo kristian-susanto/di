@@ -260,12 +260,11 @@
         startTime = timeMatch[0];
       }
       
-      // Regex baru untuk mendeteksi format 6 karakter seperti (+08:00) atau (-03:30)
       const tzMatch = targetTimeStr.match(/\(([+-]\d{2}):(\d{2})\)/);
       if (tzMatch) {
         const hours = tzMatch[1];
         const minutes = tzMatch[2];
-        tzOffset = `${hours}:${minutes}`; // Menjadi "+08:00" atau "-03:30"
+        tzOffset = `${hours}:${minutes}`;
       }
     }
 

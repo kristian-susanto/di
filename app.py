@@ -160,18 +160,101 @@ def logout():
 @login_required
 def dashboard():
     settings = get_global_settings()
-    # Jika ditutup, hanya role superadmin yang tetap bisa akses
     if not settings.get('allow_dashboard', True) and session['user']['role'] != 'superadmin':
         flash("Halaman Dashboard saat ini sedang ditutup oleh Superadmin.", "danger")
         return redirect(url_for('logout'))
     
-    invitations = list(invitations_collection.find())
+    current_role = session['user']['role']
+    user_id = session['user']['id']
+    username = session['user']['username']
+    
+    # Ambil parameter filter event dari query string URL
+    selected_event_id = request.args.get('event_id')
+    
+    # Inisialisasi variabel metrics default
+    total_events = 0
+    attend_count = 0
+    not_attend_details = {
+        "active": 0,
+        "non_active": 0,
+        "will_attend": 0,
+        "will_not_attend": 0,
+        "total": 0
+    }
+    
+    # List dropdown acara yang tersedia berdasarkan hak akses role
+    allowed_events = []
+    
+    if current_role == 'superadmin':
+        # Superadmin melihat semua acara
+        allowed_events = list(events_collection.find())
+        total_events = len(allowed_events)
+        
+    elif current_role == 'admin':
+        # Admin melihat semua acara atau yang dia buat (sesuai spesifikasi manage_data)
+        allowed_events = list(events_collection.find())
+        total_events = len(allowed_events)
+        
+    elif current_role == 'usher':
+        # Usher melihat acara berdasarkan data allowed_events di dokumen user-nya
+        user_data = users_collection.find_one({"_id": ObjectId(user_id)})
+        allowed_event_ids = [ObjectId(eid) for eid in user_data.get('allowed_events', [])]
+        allowed_events = list(events_collection.find({"_id": {"$in": allowed_event_ids}}))
+        total_events = len(allowed_events)
+        
+    elif current_role == 'user':
+        # Role User: Tampilkan total seluruh acara yang berstatus Approved
+        total_events = events_collection.count_documents({"status": "Approved"})
+        
+        # Menghitung total Tamu Attend dan Not Attend secara global/keseluruhan (Tanpa Dropdown Acara)
+        attend_count = invitations_collection.count_documents({"status": "Attend"})
+        
+        # Tamu Not Attend untuk User adalah semua yang statusnya BUKAN "Attend"
+        total_not_attend = invitations_collection.count_documents({"status": {"$ne": "Attend"}})
+        not_attend_details["total"] = total_not_attend
 
-    return render_template('dashboard.html', user=session['user'], invitations=invitations)
+    # PROSES KALKULASI FILTER UNTUK SUPERADMIN, ADMIN, & USHER
+    if current_role in ['superadmin', 'admin', 'usher']:
+        if selected_event_id:
+            try:
+                match_event_oid = ObjectId(selected_event_id)
+                
+                # Hitung status Attend berdasarkan event yang dipilih
+                attend_count = invitations_collection.count_documents({
+                    "event_id": match_event_oid, 
+                    "status": "Attend"
+                })
+                
+                # Hitung rincian status Not Attend berdasarkan kombinasi nilai status di database
+                active = invitations_collection.count_documents({"event_id": match_event_oid, "status": "Active"})
+                non_active = invitations_collection.count_documents({"event_id": match_event_oid, "status": "Non-active"})
+                will_attend = invitations_collection.count_documents({"event_id": match_event_oid, "status": "Will be attend"})
+                will_not_attend = invitations_collection.count_documents({"event_id": match_event_oid, "status": "Will not be attend"})
+                
+                # Masukkan ke dalam dictionary rincian
+                not_attend_details = {
+                    "active": active,
+                    "non_active": non_active,
+                    "will_attend": will_attend,
+                    "will_not_attend": will_not_attend,
+                    "total": (active + non_active + will_attend + will_not_attend)
+                }
+            except Exception:
+                pass
+
+    return render_template(
+        'dashboard.html', 
+        user=session['user'], 
+        total_events=total_events,
+        allowed_events=allowed_events,
+        selected_event_id=selected_event_id,
+        attend_count=attend_count,
+        not_attend_details=not_attend_details
+    )
 
 @app.route('/manage', methods=['GET', 'POST'])
 @login_required
-@roles_required('superadmin', 'admin', 'usher')
+@roles_required('superadmin', 'admin')
 def manage_data():
     settings = get_global_settings()
     # If closed, only the superadmin role can still access it.
@@ -195,8 +278,8 @@ def manage_data():
             # Default fallback diubah menjadi format 6 karakter tanpa kata UTC
             event_timezone = request.form.get('event_timezone', '(+00:00)')
             
-            # Menggabungkan menjadi format: "10:00 - 15:00 (+08:00)"
-            full_event_time = f"{start_time} - {end_time} {event_timezone}"
+            # Menggabungkan menjadi format
+            full_event_time = f"{start_time}-{end_time} {event_timezone}"
             
             event_logo = '🎉'
             status = 'Pending Approval' if current_role == 'admin' else 'Approved'
@@ -280,7 +363,7 @@ def manage_data():
             end_time = request.form.get('event_end_time', '15:00')
             event_timezone = request.form.get('event_timezone', '+00:00')
             
-            full_event_time = f"{start_time} - {end_time} ({event_timezone})"
+            full_event_time = f"{start_time}-{end_time} ({event_timezone})"
             new_location = request.form.get('event_location')
             
             current_event = events_collection.find_one({"_id": ObjectId(event_id)})
