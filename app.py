@@ -190,13 +190,13 @@ def manage_data():
             event_name = request.form.get('event_name')
             event_date = request.form.get('event_date')
             
-            # Memecah input sesuai instruksi baru
             start_time = request.form.get('event_start_time', '10:00')
             end_time = request.form.get('event_end_time', '15:00')
-            event_timezone = request.form.get('event_timezone', 'UTC-03:30')
+            # Default fallback diubah menjadi format 6 karakter tanpa kata UTC
+            event_timezone = request.form.get('event_timezone', '(+00:00)')
             
-            # Menggabungkan menjadi format terstandarisasi: "10:00 - 15:00 (UTC-03:30)"
-            full_event_time = f"{start_time} - {end_time} ({event_timezone})"
+            # Menggabungkan menjadi format: "10:00 - 15:00 (+08:00)"
+            full_event_time = f"{start_time} - {end_time} {event_timezone}"
             
             event_logo = '🎉'
             status = 'Pending Approval' if current_role == 'admin' else 'Approved'
@@ -278,7 +278,7 @@ def manage_data():
             # Memecah input pada bagian edit event
             start_time = request.form.get('event_start_time', '10:00')
             end_time = request.form.get('event_end_time', '15:00')
-            event_timezone = request.form.get('event_timezone', 'UTC-03:30')
+            event_timezone = request.form.get('event_timezone', '+00:00')
             
             full_event_time = f"{start_time} - {end_time} ({event_timezone})"
             new_location = request.form.get('event_location')

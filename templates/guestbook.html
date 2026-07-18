@@ -161,8 +161,7 @@
                                 <thead class="table-dark sticky-top">
                                     <tr class="text-center">
                                         <th class="px-2 py-2">Guest Name</th>
-                                        <th class="py-2">Time</th>
-                                        <th class="py-2">Status</th>
+                                        <th class="py-2">Date & Time</th>
                                         <th class="py-2">Action</th>
                                     </tr>
                                 </thead>
@@ -170,19 +169,30 @@
                                     {% if attended_guests %}
                                         {% for guest in attended_guests %}
                                         <tr class="text-center guest-row" data-id="{{ guest._id }}">
-                                            <td class="px-2 fw-semibold text-truncate" style="max-width: 90px;">{{ guest.guest_name }}</td>
-                                            <td class="text-muted">{{ guest.submitted_at.strftime('%H:%M:%S') if guest.submitted_at else '-' }}</td>
-                                            <td><span class="badge bg-success" style="font-size: 0.75rem;">Hadir</span></td>
+                                            <!-- Baris 1: Nama, Baris 2: Domisili -->
+                                            <td class="px-2 fw-semibold text-start" style="max-width: 120px;">
+                                                <div class="text-truncate">{{ guest.guest_name }}</div>
+                                                <div class="text-muted fw-normal small" style="font-size: 0.75rem;">
+                                                    <i class="bi bi-geo-alt-fill me-1"></i>{{ guest.domicile | default("-", true) }}
+                                                </div>
+                                            </td>
+                                            <!-- Baris 1: Tanggal, Baris 2: Waktu + Timezone Browser -->
+                                            <td class="text-muted text-center">
+                                                <div class="fw-medium text-dark">{{ guest.submitted_at.strftime('%Y-%m-%d') if guest.submitted_at else '-' }}</div>
+                                                <div class="small local-time-display" 
+                                                    data-utc-time="{{ guest.submitted_at.isoformat() if guest.submitted_at else '' }}">
+                                                    {{ guest.submitted_at.strftime('%H:%M:%S') if guest.submitted_at else '-' }}
+                                                </div>
+                                            </td>
                                             <td>
                                                 <div class="d-flex align-items-center justify-content-center">
                                                     <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2" style="font-size: 0.75rem;"
-                                                            onclick="showGuestDetail({
+                                                            onclick="showGuestDetailWithTimezone(this, {
                                                                 name: '{{ guest.guest_name | escape }}',
-                                                                domisili: '{{ guest.domicile | default("-", true) | escape }}',
-                                                                phone: '{{ guest.phone | default("-", true) | escape }}',
-                                                                sumber: '{{ guest.source_from | default("Database", true) }}, {{ guest.source_method | default("Manual", true) }}',
-                                                                waktu: '{{ guest.submitted_at.strftime("%H:%M:%S") if guest.submitted_at else "-" }}'
-                                                            })"
+                                                                domisili: '{{ guest.domicile | default('-', true) | escape }}',
+                                                                phone: '{{ guest.phone_number | default('-', true) | escape }}',
+                                                                sumber: '{{ guest.source_from | default('Database', true) }}, {{ guest.source_method | default('Manual', true) }}'
+                                                            })">
                                                         <i class="bi bi-eye-fill"></i> Detail
                                                     </button>
                                                 </div>
@@ -191,7 +201,7 @@
                                         {% endfor %}
                                     {% else %}
                                         <tr>
-                                            <td colspan="4" class="text-center py-4 text-muted small">There are no guests recorded as attending this event.</td>
+                                            <td colspan="3" class="text-center py-4 text-muted small">There are no guests recorded as attending this event.</td>
                                         </tr>
                                     {% endif %}
                                 </tbody>
@@ -469,6 +479,45 @@
         }
 
         html5QrcodeScanner.render(onScanSuccess);
+
+        // 1. Ambil format offset timezone browser (Contoh: "+07:00" atau "+00:00")
+        const getBrowserTimezoneOffset = () => {
+            const offsetMinutes = new Date().getTimezoneOffset();
+            if (offsetMinutes === 0) return "(+00:00)";
+            
+            const sign = offsetMinutes > 0 ? "-" : "+";
+            const absMinutes = Math.abs(offsetMinutes);
+            const hours = String(Math.floor(absMinutes / 60)).padStart(2, '0');
+            const minutes = String(absMinutes % 60).padStart(2, '0');
+            
+            return `(${sign}${hours}:${minutes})`;
+        };
+
+        const tzOffsetString = getBrowserTimezoneOffset();
+
+        // 2. Tempelkan offset tersebut ke setiap baris tabel waktu
+        document.querySelectorAll('.local-time-display').forEach(el => {
+            const utcTimeRaw = el.getAttribute('data-utc-time');
+            if (utcTimeRaw) {
+                // Mempertahankan jam dari server, hanya menambahkan offset browser di belakangnya
+                const currentTimeText = el.innerText.trim();
+                el.innerHTML = `${currentTimeText} <span class="text-primary fw-semibold">${tzOffsetString}</span>`;
+            }
+        });
     });
+
+    function showGuestDetailWithTimezone(buttonElement, guestData) {
+        // Ambil string waktu beserta offset dari kolom tabel terdekat
+        const timeRow = buttonElement.closest('tr').querySelector('.local-time-display');
+        const completeTimeText = timeRow ? timeRow.innerText.trim() : "-";
+        
+        // Kirim ke fungsi detail bawaan Anda
+        if (typeof showGuestDetail === "function") {
+            showGuestDetail({
+                ...guestData,
+                waktu: completeTimeText
+            });
+        }
+    }
 </script>
 {% endblock %}

@@ -508,18 +508,19 @@
 
     const tzInput = document.getElementById('eventTimezoneInput');
     if (tzInput) {
-        // Mendapatkan offset menit dari UTC (contoh: Bangkok/Jakarta UTC+7 adalah -420 menit)
+        // Mendapatkan offset menit dari UTC
         const offsetMinutes = new Date().getTimezoneOffset();
         
-        // Membalikkan tanda minus/plus karena getTimezoneOffset menghasilkan nilai negatif untuk zona waktu timur
+        // Membalikkan tanda minus/plus karena getTimezoneOffset menghasilkan nilai negatif untuk zona timur
         const totalOffsetHours = -offsetMinutes / 60;
         
-        // Memformat menjadi string seperti UTC+09 atau UTC-02
         const sign = totalOffsetHours >= 0 ? '+' : '-';
-        const absHours = Math.abs(Math.floor(totalOffsetHours));
-        const formattedHours = String(absHours).padStart(2, '0');
+        const absMinutes = Math.abs(offsetMinutes);
+        const hours = String(Math.floor(absMinutes / 60)).padStart(2, '0');
+        const minutes = String(absMinutes % 60).padStart(2, '0');
         
-        const timezoneString = `UTC${sign}${formattedHours}`;
+        // Hasil penulisan tepat 6 karakter tanpa huruf UTC, contoh: (+08:00) atau (-03:30)
+        const timezoneString = `(${sign}${hours}:${minutes})`;
         
         // Set nilai input hidden dengan zona waktu yang terdeteksi
         tzInput.value = timezoneString;
