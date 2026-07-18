@@ -1,640 +1,387 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{{ invite.title }} - Invitation</title>
-    {% if event and event.event_logo and event.event_logo.startswith('/static') %}
-      <link rel="icon" href="{{ event.event_logo }}">
-    {% else %}
-      <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>{{ event.event_logo if (event and event.event_logo) else '🎉' }}</text></svg>">
-    {% endif %}
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
-    <style>
-      body {
-        background: #f4f1ea;
-        font-family: "Playfair Display", "Georgia", serif;
-        overflow-x: hidden;
-      }
+{% extends 'base.html' %} 
+{% block content %}
 
-      /* --- STYLE UNTUK COVER AMPLOP --- */
-      .envelope-cover {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100vh;
-        background:
-          linear-gradient(rgba(244, 241, 234, 0.92), rgba(244, 241, 234, 0.92)),
-          url("https://www.transparenttextures.com/patterns/cream-paper.png"),
-          #fbfaf8;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        z-index: 9999;
-        transition: transform 1.2s cubic-bezier(0.77, 0, 0.175, 1);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-        padding: 20px;
-      }
+<!-- Google Fonts & Custom CSS untuk Tema Undangan Elegan -->
+<link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Montserrat:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  .invitation-body {
+    font-family: 'Montserrat', sans-serif;
+    color: #333;
+    overflow-x: hidden;
+  }
+  .hero-section {
+    background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.6)), url('https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=1200') center/cover no-repeat;
+    color: white;
+    padding: 80px 20px;
+    border-radius: 15px;
+    text-align: center;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+  }
+  .romantic-title {
+    font-family: 'Great Vibes', cursive;
+    font-size: 4.5rem;
+    color: #f8f9fa;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+  }
+  
+  /* --- STYLING COUNTDOWN TIMER --- */
+  .countdown-container {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 25px;
+  }
+  .countdown-box {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+    padding: 10px;
+    min-width: 75px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  }
+  .countdown-number {
+    font-size: 2rem;
+    font-weight: 700;
+    display: block;
+    line-height: 1.2;
+  }
+  .countdown-label {
+    font-size: 0.75rem;
+    text-uppercase: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.9;
+  }
 
-      .envelope-open {
-        transform: translateY(-100vh);
-      }
+  .card-custom {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    background: #ffffff;
+    transition: transform 0.3s;
+  }
+  .card-custom:hover {
+    transform: translateY(-5px);
+  }
+  .badge-status {
+    font-size: 0.9rem;
+    padding: 8px 16px;
+    border-radius: 20px;
+  }
+  .wishes-box {
+    max-height: 300px;
+    overflow-y: auto;
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 15px;
+  }
+  .wish-item {
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+  }
+  .wish-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+</style>
 
-      .brand-title {
-        text-transform: uppercase;
-        letter-spacing: 3px;
-        color: #8a7b6e;
-        font-size: 1rem;
-        margin-bottom: 1.5rem;
-      }
-
-      .envelope-wrapper {
-        position: relative;
-        cursor: pointer;
-        width: 100%;
-        max-width: 450px;
-        perspective: 1000px;
-      }
-
-      .letter-card {
-        background: #ffffff;
-        padding: 30px 25px;
-        border-radius: 8px;
-        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
-        border: 1px solid #eae5d9;
-        transition: all 0.4s ease;
-        position: relative;
-      }
-
-      .letter-card::before {
-        content: "";
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        right: 10px;
-        bottom: 10px;
-        border: 1px dashed #d1c7bd;
-        pointer-events: none;
-      }
-
-      .action-seal {
-        background-color: #d63384;
-        color: white;
-        border: none;
-        padding: 10px 24px;
-        font-size: 0.95rem;
-        border-radius: 50px;
-        text-transform: uppercase;
-        font-weight: 600;
-        margin-top: 15px;
-      }
-
-      /* --- STYLE UNTUK ISI UTAMA UNDANGAN --- */
-      .invitation-container {
-        padding: 60px 20px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .main-content {
-        opacity: 0;
-        transform: translateY(40px);
-        transition:
-          opacity 1.2s ease 0.4s,
-          transform 1.2s ease 0.4s;
-        max-width: 650px;
-        width: 100%;
-      }
-
-      .main-content.show {
-        opacity: 1;
-        transform: translateY(0);
-      }
-
-      /* Countdown Styles */
-      .countdown-container {
-        display: flex;
-        justify-content: center;
-        gap: 15px;
-        margin: 25px 0;
-      }
-
-      .countdown-box {
-        background: #8a7b6e;
-        color: white;
-        padding: 10px;
-        border-radius: 8px;
-        min-width: 70px;
-        text-align: center;
-      }
-
-      .countdown-number {
-        font-size: 1.5rem;
-        font-weight: bold;
-        display: block;
-      }
-
-      .countdown-label {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        opacity: 0.8;
-      }
-
-      /* Maps Styles */
-      .map-responsive {
-        overflow: hidden;
-        padding-bottom: 56.25%;
-        position: relative;
-        height: 0;
-        border-radius: 12px;
-        margin-top: 15px;
-        border: 1px solid #eae5d9;
-      }
-
-      .map-responsive iframe {
-        left: 0;
-        top: 0;
-        height: 100%;
-        width: 100%;
-        position: absolute;
-      }
-
-      /* List Ucapan Scrollable */
-      .wishes-list {
-        max-height: 300px;
-        overflow-y: auto;
-        text-align: left;
-        border: 1px solid #eae5d9;
-        border-radius: 8px;
-        padding: 15px;
-        background: #fdfcf9;
-      }
-
-      /* Galeri Foto Pre-Wedding */
-      .gallery-img {
-        width: 100%;
-        height: 200px;
-        object-fit: cover;
-        border-radius: 8px;
-        transition: transform 0.3s ease;
-      }
-
-      .gallery-img:hover {
-        transform: scale(1.03);
-      }
-    </style>
-  </head>
-  <body>
-    <div id="envelopeCover" class="envelope-cover">
-      <div class="brand-title">Digital Invitation</div>
-
-      <div class="envelope-wrapper" onclick="handleManualOpen()">
-        <div class="letter-card">
-          <p
-            class="text-muted text-uppercase tracking-wider small mb-2"
-            style="font-size: 0.75rem"
-          >
-            We Invite You to The Wedding of
-          </p>
-          <h2 class="h3 fw-normal mb-4" style="color: #2b2d42">
-            {{ invite.title }}
-          </h2>
-          <hr class="w-25 mx-auto my-3" style="border-color: #b5a494" />
-          <div class="my-3">
-            <p class="mb-1 text-muted small" style="font-style: italic">
-              Kepada Yth. Bapak/Ibu/Saudara/i:
-            </p>
-            <h4 class="fw-bold text-dark">{{ invite.guest_name }}</h4>
-          </div>
-          <span class="btn action-seal" onclick="handleManualOpen()">Buka Surat</span>
-        </div>
+<div class="invitation-body container my-4">
+  
+  <!-- HERO / COVER ACARA -->
+  <div class="hero-section mb-5 animate__animated animate__fadeIn">
+    <div class="mb-3 fs-1">
+      {% if event.event_logo and (event.event_logo.startswith('http') or event.event_logo.startswith('/')) %}
+        <img src="{{ event.event_logo }}" alt="Logo" class="rounded-circle bg-white p-2" style="width: 100px; height: 100px; object-fit: cover;">
+      {% else %}
+        <span>{{ event.event_logo if event.event_logo else '✨' }}</span>
+      {% endif %}
+    </div>
+    <p class="text-uppercase tracking-wide mb-2 fw-semibold" style="letter-spacing: 3px; color: #eaeaea;">The Wedding / Event Invitation Of</p>
+    <h1 class="romantic-title mb-3">{{ event.event_name }}</h1>
+    
+    <!-- FITUR BARU: COUNTDOWN TIMER DISPLAY -->
+    <div class="countdown-container animate__animated animate__zoomIn animate__delay-1s">
+      <div class="countdown-box">
+        <span class="countdown-number" id="days">00</span>
+        <span class="countdown-label">Hari</span>
+      </div>
+      <div class="countdown-box">
+        <span class="countdown-number" id="hours">00</span>
+        <span class="countdown-label">Jam</span>
+      </div>
+      <div class="countdown-box">
+        <span class="countdown-number" id="minutes">00</span>
+        <span class="countdown-label">Menit</span>
+      </div>
+      <div class="countdown-box">
+        <span class="countdown-number" id="seconds">00</span>
+        <span class="countdown-label">Detik</span>
       </div>
     </div>
+    <div id="eventPassedMessage" class="mt-3 fw-bold text-warning d-none">🎉 Acara Sedang Berlangsung / Telah Selesai 🎉</div>
 
-    <div class="container invitation-container main-content" id="mainContent">
-      <div
-        class="card p-4 p-md-5 shadow-lg border-0 rounded-4 w-100 bg-white text-center mb-4"
-      >
-        <p class="text-muted tracking-wide text-uppercase mb-2">
-          You Are Cordially Invited To
-        </p>
-        <h1
-          class="display-5 my-2 text-secondary"
-          style="font-family: &quot;Playfair Display&quot;, serif"
-        >
-          {{ invite.title }}
-        </h1>
-        <hr class="w-25 mx-auto my-4" />
+    <hr class="w-25 mx-auto border-light my-4">
+    <p class="lead mb-0">Dear, <strong>{{ invite.guest_name }}</strong></p>
+    <span class="badge bg-light text-dark mt-2 px-3 py-2 fw-semibold">
+      <i class="bi bi-envelope-open-fill text-primary me-2"></i>E-Invitation Resmi
+    </span>
+  </div>
 
-        <p class="fs-5">Dear, <strong>{{ invite.guest_name }}</strong></p>
-        <p class="text-muted">
-          Merupakan suatu kebahagiaan bagi kami apabila Bapak/Ibu/Saudara/i
-          berkenan hadir di acara istimewa kami.
-        </p>
+  <div class="row g-4">
+    <!-- KOLOM KIRI: DETAIL ACARA & QR CODE -->
+    <div class="col-md-6">
+      <div class="card card-custom p-4 h-100 d-flex flex-column justify-content-between">
+        <div>
+          <h4 class="fw-bold text-primary mb-4 d-flex align-items-center gap-2">
+            <i class="bi bi-calendar-heart"></i> Detail Pelaksanaan Acara
+          </h4>
+          <table class="table table-borderless align-middle mb-4">
+            <tr>
+              <td class="text-muted fw-semibold w-25" style="font-size: 0.9rem;"><i class="bi bi-calendar3 me-2"></i>Tanggal</td>
+              <td>: <strong>{{ event.event_date }}</strong></td>
+            </tr>
+            <tr>
+              <td class="text-muted fw-semibold" style="font-size: 0.9rem;"><i class="bi bi-clock me-2"></i>Waktu</td>
+              <td>: {{ event.event_time }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted fw-semibold" style="font-size: 0.9rem;"><i class="bi bi-geo-alt me-2"></i>Lokasi</td>
+              <td>: {{ event.event_location }}</td>
+            </tr>
+          </table>
 
-        <div class="my-4">
-          <h6 class="text-uppercase text-secondary tracking-wider small">
-            Menghitung Mundur Hari H
-          </h6>
-          <div class="countdown-container" id="countdown">
-            <div class="countdown-box">
-              <span class="countdown-number" id="days">00</span
-              ><span class="countdown-label">Hari</span>
-            </div>
-            <div class="countdown-box">
-              <span class="countdown-number" id="hours">00</span
-              ><span class="countdown-label">Jam</span>
-            </div>
-            <div class="countdown-box">
-              <span class="countdown-number" id="minutes">00</span
-              ><span class="countdown-label">Menit</span>
-            </div>
-            <div class="countdown-box">
-              <span class="countdown-number" id="seconds">00</span
-              ><span class="countdown-label">Detik</span>
-            </div>
+          <!-- PETA LOKASI EMBED -->
+          {% set embed_maps_url = "https://maps.google.com/maps?q=" ~ (event.event_location | urlencode) ~ "&t=&z=15&ie=UTF8&iwloc=&output=embed" %}
+          <div class="border rounded overflow-hidden shadow-sm mb-4" style="height: 200px;">
+            <iframe src="{{ embed_maps_url }}" style="width: 100%; height: 100%; border: 0;" allowfullscreen="" loading="lazy"></iframe>
           </div>
         </div>
 
-        <div class="bg-light p-4 my-4 rounded-3 border">
-          <h5 class="mb-2" style="color: #8a7b6e">Waktu & Tanggal</h5>
-          <p class="mb-3 fw-bold text-dark fs-5">{{ invite.date }}</p>
-
-          <a
-            id="btnCalendar"
-            href="#"
-            target="_blank"
-            class="btn btn-sm btn-outline-dark rounded-pill px-3"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              fill="currentColor"
-              class="bi bi-calendar-plus me-2"
-              viewBox="0 0 16 16"
-            >
-              <path
-                d="M8 7a.5.5 0 0 1 .5.5v2H10a.5.5 0 0 1 0 1H8.5V12a.5.5 0 0 1-1 0v-1.5H6a.5.5 0 0 1 0-1h1.5v-2A.5.5 0 0 1 8 7"
-              />
-              <path
-                d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"
-              />
-            </svg>
-            Simpan di Google Calendar
-          </a>
+        <!-- QR CODE SEBAGAI TIKET MASUK -->
+        {% if allow_qrcode and qr_code_url %}
+        <div class="text-center p-3 bg-light rounded border border-dashed">
+          <p class="small text-muted mb-2 fw-bold"><i class="bi bi-qr-code"></i> QR CODE TIKET MASUK</p>
+          <img src="{{ qr_code_url }}" alt="QR Code Tiket Masuk" class="img-thumbnail shadow-sm mb-2" style="width: 140px; height: 140px;">
+          <small class="d-block text-muted" style="font-size: 0.75rem;">Tunjukkan QR Code ini kepada Usher / Petugas Buku Tamu saat menghadiri acara.</small>
         </div>
-
-        <div class="my-4 text-center">
-          <h5 style="color: #8a7b6e" class="mb-2">Lokasi Acara</h5>
-          <p class="text-dark mb-3 px-3">
-            <strong>Gedung Pertemuan Utama</strong><br /><span
-              class="text-muted small"
-              >Jl. Anggrek No. 123, Kota Pusat, Indonesia</span
-            >
-          </p>
-
-          <a
-            href="https://maps.google.com"
-            target="_blank"
-            class="btn btn-primary rounded-pill px-4 mb-3"
-            style="background-color: #8a7b6e; border: none"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              fill="currentColor"
-              class="bi bi-geo-alt-fill me-2"
-              viewBox="0 0 16 16"
-            >
-              <path
-                d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10m0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6"
-              />
-            </svg>
-            See Location (Google Maps)
-          </a>
-
-          <div class="map-responsive">
-            <iframe
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3966.27372778396!2d106.8248881!3d-6.2275605!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNsKwMTMnMzkuMiJTIDEwNlw0OScyOS42IkU!5e0!3m2!1sid!2sid!4v1625000000000!5m2!1sid!2sid"
-              width="600"
-              height="450"
-              style="border: 0"
-              allowfullscreen=""
-              loading="lazy"
-            >
-            </iframe>
-          </div>
-        </div>
-
-        <div class="my-5">
-          <hr class="my-4" />
-          <h5 style="color: #8a7b6e" class="mb-4">Our Moments</h5>
-          <div class="row g-3">
-            <div class="col-6 col-md-4">
-              <img
-                src="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?w=500"
-                class="gallery-img"
-                alt="Prewedding 1"
-              />
-            </div>
-            <div class="col-6 col-md-4">
-              <img
-                src="https://images.unsplash.com/photo-1519741497674-611481863552?w=500"
-                class="gallery-img"
-                alt="Prewedding 2"
-              />
-            </div>
-            <div class="col-6 col-md-4">
-              <img
-                src="https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=500"
-                class="gallery-img"
-                alt="Prewedding 3"
-              />
-            </div>
-          </div>
-        </div>
-
-        <!-- ================= FORM 1: KONFIRMASI KEHADIRAN (RSVP) ================= -->
-        <div class="container my-5 text-center" id="rsvp-section">
-          <div class="card shadow-sm border-0 p-4 bg-white mx-auto" style="max-width: 600px; border-radius: 15px;">
-            <h3 class="fw-bold mb-3" style="font-family: 'Playfair Display', serif;">Konfirmasi Kehadiran (RSVP)</h3>
-            <p class="text-muted small mb-4">Mohon isi kehadiran Anda dan jumlah pax yang akan dibawa.</p>
-
-            <form id="rsvpForm" action="/{{ display_id }}/rsvp" method="POST">
-              <div class="mb-3 text-start">
-                <label class="form-label small fw-bold">Nama Tamu</label>
-                <input type="text" name="guest_name" class="form-control" value="{{ invite.guest_name }}" readonly required>
-              </div>
-
-              <div class="mb-3 text-start">
-                <label class="form-label small fw-bold">Confirmation of Attendance</label>
-                
-                <!-- Jika sudah Attend, kita buat select ini DISABLED agar tidak bisa dipencet -->
-                <select name="status" class="form-select" required {% if current_rsvp and current_rsvp.status == 'Attend' %}disabled{% endif %}>
-                  {% if current_rsvp and current_rsvp.status == 'Attend' %}
-                    <option value="Attend" selected>✅ You have attended</option>
-                  {% else %}
-                    <option value="" disabled selected>Will you be attending?</option>
-                  {% endif %}
-                  <option value="Will be attend" {% if current_rsvp and current_rsvp.status == 'Will be attend' %}selected{% endif %}>✅ Yes, I Will Attend</option>
-                  <option value="Will not be attend" {% if current_rsvp and current_rsvp.status == 'Will not be attend' %}selected{% endif %}>❌ Sorry, I Can't Attend</option>
-                </select>
-
-                <!-- Input cadangan tersembunyi agar nilai 'Attend' tetap terkirim ke server saat submit -->
-                {% if current_rsvp and current_rsvp.status == 'Attend' %}
-                  <input type="hidden" name="status" value="Attend">
-                {% endif %}
-              </div>
-
-              <div class="mb-3 text-start">
-                <label class="form-label small fw-bold">Number of People</label>
-                <input type="number" name="total_guests" class="form-control" min="1" value="{{ current_rsvp.total_guests if (current_rsvp and current_rsvp.total_guests) else 1 }}" required {% if current_rsvp and current_rsvp.status == 'Attend' %}readonly{% endif %}>
-              </div>
-
-              <button type="submit" class="btn btn-dark w-100 py-2 fw-bold" style="border-radius: 8px;">Send Attendance Confirmation</button>
-            </form>
-          </div>
-        </div>
-
-        <!-- ================= FORM 2: BERIKAN UCAPAN & DOA RESTU ================= -->
-        <div class="container my-5 text-center" id="wishes-section">
-          <div class="card shadow-sm border-0 p-4 bg-white mx-auto" style="max-width: 600px; border-radius: 15px;">
-            <h3 class="fw-bold mb-3" style="font-family: 'Playfair Display', serif;">Kirim Doa Restu & Ucapan</h3>
-            <p class="text-muted small mb-4">Berikan ucapan selamat manis Anda untuk kedua mempelai.</p>
-
-            <form id="wishesForm" action="/{{ display_id }}/wishes" method="POST">
-              <div class="mb-3 text-start">
-                <label class="form-label small fw-bold">Nama Pengirim</label>
-                <input type="text" name="guest_name" class="form-control" value="{{ invite.guest_name }}" readonly required>
-              </div>
-
-              <div class="mb-4 text-start">
-                <label class="form-label small fw-bold">Berikan Ucapan & Doa Restu</label>
-                <!-- Mengisi value lama jika tamu sudah pernah mengisi wishes -->
-                <textarea name="wishes" class="form-control" rows="4" placeholder="Tulis ucapan selamat Anda di sini..." required>{{ current_rsvp.wishes if current_rsvp else '' }}</textarea>
-              </div>
-
-              <button type="submit" class="btn btn-secondary w-100 py-2 fw-bold" style="border-radius: 8px; background-color: #8a7b6e; border: none;">Kirim Ucapan</button>
-            </form>
-          </div>
-        </div>
-
-        <!-- ================= PLAY LIST UCAPAN DARI TAMU LAIN ================= -->
-        <div class="container my-5 text-center">
-          <h4 class="fw-bold mb-4" style="font-family: 'Playfair Display', serif;">Ucapan & Doa Tamu Undangan</h4>
-          <div id="wishesContainer" class="mx-auto" style="max-width: 600px; max-height: 400px; overflow-y: auto; text-align: left;">
-            {% for wish in all_wishes %}
-              <div class="p-3 bg-white border rounded mb-2 shadow-sm">
-                <strong class="text-dark d-block mb-1">{{ wish.guest_name }}</strong>
-                <p class="mb-0 text-secondary italic small" style="font-style: italic;">"{{ wish.wishes }}"</p>
-              </div>
-            {% else %}
-              <p id="emptyWishes" class="text-muted text-center small">Belum ada ucapan dari tamu undangan lain.</p>
-            {% endfor %}
-          </div>
-        </div>
-
-        <!-- Cari bagian Kode HTML Digital Guest Book QR Code di invitation.html, bungkus dengan kode if berikut -->
-        {% if allow_qrcode %}
-        <div class="container my-5 text-center">
-          <div class="p-4 mx-auto border bg-white shadow-sm d-inline-block" style="border-radius: 20px; max-width: 320px;">
-            <h5 class="fw-bold mb-2" style="font-family: 'Playfair Display', serif;">Digital Guest Book QR Code</h5>
-            <p class="text-muted text-center" style="font-size: 0.8rem; line-height: 1.3;">Tunjukkan QR Code ini kepada petugas <strong>Usher</strong> di meja penerima tamu untuk melakukan registrasi kehadiran masuk.</p>
-            
-            <div class="bg-light p-3 my-3 d-inline-block rounded border">
-              <img src="{{ qr_code_url }}" alt="QR Code Tamu" class="img-fluid" style="width: 200px; height: 200px;">
-            </div>
-            
-            <div class="badge bg-dark text-uppercase px-3 py-2" style="font-size: 0.85rem; letter-spacing: 1px;">
-              {{ invite.guest_name }}
-            </div>
-          </div>
+        {% else %}
+        <div class="alert alert-secondary text-center py-2" style="font-size: 0.85rem;">
+          <i class="bi bi-info-circle me-1"></i> Fitur QR Code Check-In dinonaktifkan oleh sistem.
         </div>
         {% endif %}
-
-        <div class="mt-5 pt-4 text-center">
-          <h2
-            style="
-              font-family: &quot;Great Vibes&quot;, cursive;
-              color: #8a7b6e;
-            "
-            class="display-4"
-          >
-            Terima Kasih
-          </h2>
-          <p class="text-muted mt-2 small">
-            Merupakan suatu kehormatan & kebahagiaan bagi kami atas kehadiran
-            serta doa restu Bapak/Ibu/Saudara/i sekalian.
-          </p>
-          <p class="fw-bold mt-4" style="letter-spacing: 2px; color: #333">
-            Kami Yang Berbahagia
-          </p>
-        </div>
       </div>
     </div>
 
-    <!-- SweetAlert2 Library -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- KOLOM KANAN: RSVP & DO'A/UCAPAN -->
+    <div class="col-md-6">
+      <div class="card card-custom p-4 mb-4">
+        <h4 class="fw-bold text-success mb-3 d-flex align-items-center gap-2">
+          <i class="bi bi-check2-circle"></i> Konfirmasi Kehadiran (RSVP)
+        </h4>
 
-    <script>
-      const targetDateStr = "{{ invite.date }}";
+        <!-- Form Pengiriman RSVP AJAX -->
+        <form id="rsvpForm">
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-secondary">Apakah Anda akan menghadiri acara?</label>
+            <select name="status" class="form-select shadow-none" required {% if current_rsvp and current_rsvp.status == 'Attend' %}disabled{% endif %}>
+              {% if current_rsvp and current_rsvp.status == 'Attend' %}
+                <option value="Attend" selected>✅ You have attended</option>
+              {% else %}
+                <option value="" disabled selected>Pilih Status Kehadiran</option>
+              {% endif %}
+              <option value="Will be attend" {% if current_rsvp and current_rsvp.status == 'Will be attend' %}selected{% endif %}>Yes, I Will Attend</option>
+              <option value="Will not be attend" {% if current_rsvp and current_rsvp.status == 'Will not be attend' %}selected{% endif %}>Sorry, I Can't Attend</option>
+            </select>
+            <!-- Input cadangan tersembunyi agar nilai 'Attend' tetap terkirim ke server saat submit -->
+            {% if current_rsvp and current_rsvp.status == 'Attend' %}
+              <input type="hidden" name="status" value="Attend">
+            {% endif %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-secondary">Jumlah Tamu yang Hadir</label>
+            <input type="number" name="total_guests" class="form-control shadow-none" min="1" value="{{ current_rsvp.total_guests if current_rsvp.total_guests else 1 }}" required {% if current_rsvp and current_rsvp.status == 'Attend' %}readonly{% endif %}>
+          </div>
+          <button type="submit" class="btn btn-success w-100 fw-semibold shadow-sm">
+            <i class="bi bi-send me-1"></i> Simpan Konfirmasi Kehadiran
+          </button>
+        </form>
+      </div>
 
-      function handleManualOpen() {
-        document.getElementById("envelopeCover").classList.add("envelope-open");
-        document.getElementById("mainContent").classList.add("show");
-        setTimeout(function () {
-          document.getElementById("envelopeCover").style.display = "none";
-        }, 1200);
+      <!-- KOTAK UCAPAN / WISHES -->
+      <div class="card card-custom p-4">
+        <h4 class="fw-bold text-info mb-3 d-flex align-items-center gap-2">
+          <i class="bi bi-chat-heart"></i> Kirim Doa & Ucapan
+        </h4>
+        
+        <form id="wishesForm" class="mb-4">
+          <div class="mb-3">
+            <textarea name="wishes" class="form-control shadow-none" rows="3" placeholder="Tuliskan ucapan selamat atau pesan hangat Anda di sini..." required>{{ current_rsvp.wishes if current_rsvp.wishes else '' }}</textarea>
+          </div>
+          <button type="submit" class="btn btn-info text-white w-100 fw-semibold shadow-sm">
+            <i class="bi bi-chat-dots me-1"></i> Kirim Ucapan
+          </button>
+        </form>
 
-        initCountdown();
-        initCalendarLink();
+        <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-journal-text me-1"></i> Ucapan dari Tamu Lain ({{ all_wishes|length }}):</h6>
+        <div class="wishes-box" id="wishesDisplayList">
+          {% if all_wishes %}
+            {% for w in all_wishes %}
+            <div class="wish-item">
+              <div class="fw-bold text-dark small mb-1"><i class="bi bi-person text-muted me-1"></i>{{ w.guest_name }}</div>
+              <p class="text-muted small mb-0" style="font-style: italic;">"{{ w.wishes }}"</p>
+            </div>
+            {% endfor %}
+          {% else %}
+            <p id="noWishesPlaceholder" class="text-center text-muted small py-3 mb-0">Belum ada doa dan ucapan terkumpul. Jadilah yang pertama memberikan ucapan!</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCRIPT HANDLER JAVASCRIPT -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    // ==========================================
+    // LOGIK COUNTDOWN TIMER DINAMIS GLOBAL (FIXED)
+    // ==========================================
+    const targetDateStr = "{{ event.event_date }}";
+    let targetTimeStr = "{{ event.event_time }}";
+
+    let startTime = "10:00"; 
+    let tzOffset = "+00:00";
+
+    // 1. Ekstrak jam mulai
+    if (targetTimeStr) {
+      const timeMatch = targetTimeStr.match(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]/);
+      if (timeMatch) {
+        startTime = timeMatch[0];
+      }
+      
+      // 2. Ekstrak dinamis UTC Offset (Misal: UTC+08 atau UTC+07)
+      const tzMatch = targetTimeStr.match(/UTC([+-]\d{2}):?(\d{2})?/);
+      if (tzMatch) {
+        const hours = tzMatch[1];
+        const minutes = tzMatch[2] || "00";
+        tzOffset = `${hours}:${minutes}`; // Menjadi "+08:00"
+      }
+    }
+
+    // 3. Gabungkan menjadi ISO 8601 dengan offset zona waktu spesifik
+    // Contoh hasil: "2026-07-19T10:00:00+08:00"
+    const fullTargetStr = `${targetDateStr.trim()}T${startTime}:00${tzOffset}`;
+
+    // JavaScript otomatis mengonversi string ini ke UTC absolut, independen dari lokasi browser user
+    const countdownTarget = new Date(fullTargetStr).getTime();
+
+    function updateCountdown() {
+      const now = new Date().getTime();
+      const difference = countdownTarget - now;
+
+      if (difference <= 0) {
+        clearInterval(timerInterval);
+        document.getElementById('days').innerText = "00";
+        document.getElementById('hours').innerText = "00";
+        document.getElementById('minutes').innerText = "00";
+        document.getElementById('seconds').innerText = "00";
+        document.getElementById('eventPassedMessage').classList.remove('d-none');
+        return;
       }
 
-      document.addEventListener("DOMContentLoaded", function() {
-        // Inisialisasi SweetAlert Toast
-        const Toast = Swal.mixin({
-          toast: true,
-          position: 'top',
-          showConfirmButton: false,
-          timer: 5000,
-          timerProgressBar: true,
-          didOpen: (toast) => {
-            toast.addEventListener('mouseenter', Swal.stopTimer)
-            toast.addEventListener('mouseleave', Swal.resumeTimer)
-          }
-        });
+      // Kalkulasi Matematika Waktu
+      const d = Math.floor(difference / (1000 * 60 * 60 * 24));
+      const h = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const m = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+      const s = Math.floor((difference % (1000 * 60)) / 1000);
 
-        // 1. AJAX FORM RSVP
-        const rsvpForm = document.getElementById('rsvpForm');
-        if (rsvpForm) {
-          rsvpForm.addEventListener('submit', function(e) {
-            e.preventDefault(); 
-            const formData = new FormData(this);
+      // Tampilkan ke komponen HTML
+      document.getElementById('days').innerText = d < 10 ? '0' + d : d;
+      document.getElementById('hours').innerText = h < 10 ? '0' + h : h;
+      document.getElementById('minutes').innerText = m < 10 ? '0' + m : m;
+      document.getElementById('seconds').innerText = s < 10 ? '0' + s : s;
+    }
 
-            fetch(this.action, {
-              method: 'POST',
-              body: formData
-            })
-            .then(res => res.json())
-            .then(data => {
-              if (data.status === 'success') {
-                Toast.fire({ icon: 'success', title: data.message });
-              } else {
-                Toast.fire({ icon: 'error', title: data.message });
-              }
-            })
-            .catch(() => {
-              Toast.fire({ icon: 'error', title: 'Gagal memproses koneksi RSVP.' });
-            });
-          });
+    updateCountdown();
+    const timerInterval = setInterval(updateCountdown, 1000);
+
+    // ==========================================
+    // AJAX FORMS HANDLER (RSVP & WISHES)
+    // ==========================================
+    const invitationOid = "{{ current_rsvp._id }}";
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top',
+      showConfirmButton: false,
+      timer: 3000,
+      timerProgressBar: true
+    });
+
+    // Handler Submit RSVP
+    const rsvpForm = document.getElementById('rsvpForm');
+    rsvpForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const formData = new FormData(rsvpForm);
+      
+      fetch(`/${invitationOid}/rsvp`, {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.status === 'success') {
+          Toast.fire({ icon: 'success', title: data.message })
+          .then(() => { window.location.reload(); });
+        } else {
+          Toast.fire({ icon: 'error', title: data.message || 'Gagal menyimpan rsvp.' });
         }
-
-        // AJAX FORM WISHES
-        const wishesForm = document.getElementById('wishesForm');
-        if (wishesForm) {
-          wishesForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-
-            fetch(this.action, {
-              method: 'POST',
-              body: formData
-            })
-            .then(res => res.json())
-            .then(data => {
-              if (data.status === 'success') {
-                Toast.fire({ icon: 'success', title: data.message });
-                
-                const container = document.getElementById('wishesContainer');
-                if (container && data.wishes_list) {
-                  container.innerHTML = ''; // Kosongkan kontainer lama terlebih dahulu
-                  
-                  // Render ulang seluruh daftar ucapan yang dikirimkan oleh server
-                  data.wishes_list.forEach(item => {
-                    const div = document.createElement('div');
-                    div.className = 'p-3 bg-white border rounded mb-2 shadow-sm';
-                    div.innerHTML = `
-                      <strong class="text-dark d-block mb-1">${item.guest_name}</strong>
-                      <p class="mb-0 text-secondary small" style="font-style: italic;">"${item.wishes}"</p>
-                    `;
-                    container.appendChild(div);
-                  });
-                }
-              } else {
-                Toast.fire({ icon: 'error', title: data.message });
-              }
-            })
-            .catch(() => {
-              Toast.fire({ icon: 'error', title: 'Gagal memperbarui ucapan.' });
-            });
-          });
-        }
+      })
+      .catch(() => {
+        Toast.fire({ icon: 'error', title: 'Terjadi kesalahan sistem.' });
       });
+    });
 
-      // LOGIK COUNTDOWN TIMER
-      function initCountdown() {
-        let targetDate = new Date(targetDateStr).getTime();
-        if (isNaN(targetDate)) {
-          targetDate = new Date().getTime() + 7 * 24 * 60 * 60 * 1000;
-        }
+    // Handler Submit Wishes
+    const wishesForm = document.getElementById('wishesForm');
+    wishesForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const formData = new FormData(wishesForm);
+      
+      fetch(`/${invitationOid}/wishes`, {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.status === 'success') {
+          Toast.fire({ icon: 'success', title: data.message });
+          const wishesDisplayList = document.getElementById('wishesDisplayList');
+          wishesDisplayList.innerHTML = '';
 
-        const timerInterval = setInterval(function () {
-          const now = new Date().getTime();
-          const distance = targetDate - now;
-
-          if (distance < 0) {
-            clearInterval(timerInterval);
-            document.getElementById("countdown").innerHTML =
-              "<span class='fw-bold text-danger text-uppercase'>Acara Telah Berlangsung</span>";
-            return;
+          if (data.wishes_list && data.wishes_list.length > 0) {
+            data.wishes_list.forEach(function (w) {
+              const item = document.createElement('div');
+              item.className = 'wish-item';
+              item.innerHTML = `
+                <div class="fw-bold text-dark small mb-1"><i class="bi bi-person text-muted me-1"></i>${w.guest_name}</div>
+                <p class="text-muted small mb-0" style="font-style: italic;">"${w.wishes}"</p>
+              `;
+              wishesDisplayList.appendChild(item);
+            });
+          } else {
+            wishesDisplayList.innerHTML = '<p class="text-center text-muted small py-3 mb-0">Belum ada doa.</p>';
           }
+          wishesForm.reset();
+        } else {
+          Toast.fire({ icon: 'error', title: data.message || 'Gagal mengirim ucapan.' });
+        }
+      })
+      .catch(() => {
+        Toast.fire({ icon: 'error', title: 'Terjadi kesalahan sistem.' });
+      });
+    });
+  });
+</script>
 
-          const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-          const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-          const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-          const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
-          document.getElementById("days").innerText = days < 10 ? "0" + days : days;
-          document.getElementById("hours").innerText = hours < 10 ? "0" + hours : hours;
-          document.getElementById("minutes").innerText = minutes < 10 ? "0" + minutes : minutes;
-          document.getElementById("seconds").innerText = seconds < 10 ? "0" + seconds : seconds;
-        }, 1000);
-      }
-
-      // LOGIK GOOGLE CALENDAR
-      function initCalendarLink() {
-        const title = encodeURIComponent("{{ invite.title }}");
-        let baseDate = new Date(targetDateStr);
-        if (isNaN(baseDate.getTime())) baseDate = new Date();
-
-        const year = baseDate.getFullYear();
-        const month = String(baseDate.getMonth() + 1).padStart(2, "0");
-        const day = String(baseDate.getDate()).padStart(2, "0");
-
-        const dateParam = `${year}${month}${day}T090000/${year}${month}${day}T130000`;
-        const details = encodeURIComponent("Undangan digital formal untuk menghadiri acara: {{ invite.title }}");
-        const location = encodeURIComponent("Gedung Pertemuan Utama, Jl. Anggrek No.123");
-
-        const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dateParam}&details=${details}&location=${location}&sf=true&output=xml`;
-
-        document.getElementById("btnCalendar").setAttribute("href", googleCalendarUrl);
-      }
-    </script>
-  </body>
-</html>
+{% endblock %}

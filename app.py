@@ -189,17 +189,23 @@ def manage_data():
         if form_type == 'create_event':
             event_name = request.form.get('event_name')
             event_date = request.form.get('event_date')
-            event_time = request.form.get('event_time', '10:00 - 13:00')
-            event_location = request.form.get('event_location', 'Great Wall of China')
-            event_logo = '🎉'
             
+            # Memecah input sesuai instruksi baru
+            start_time = request.form.get('event_start_time', '10:00')
+            end_time = request.form.get('event_end_time', '15:00')
+            event_timezone = request.form.get('event_timezone', 'UTC-03:30')
+            
+            # Menggabungkan menjadi format terstandarisasi: "10:00 - 15:00 (UTC-03:30)"
+            full_event_time = f"{start_time} - {end_time} ({event_timezone})"
+            
+            event_logo = '🎉'
             status = 'Pending Approval' if current_role == 'admin' else 'Approved'
             
             events_collection.insert_one({
                 "event_name": event_name,
                 "event_date": event_date,
-                "event_time": event_time,
-                "event_location": event_location,
+                "event_time": full_event_time, 
+                "event_location": "Great Wall of China",
                 "event_logo": event_logo,
                 "status": status,
                 "created_by": username
@@ -268,7 +274,13 @@ def manage_data():
             event_id = request.form.get('event_id')
             new_name = request.form.get('event_name')
             new_date = request.form.get('event_date')
-            new_time = request.form.get('event_time')
+            
+            # Memecah input pada bagian edit event
+            start_time = request.form.get('event_start_time', '10:00')
+            end_time = request.form.get('event_end_time', '15:00')
+            event_timezone = request.form.get('event_timezone', 'UTC-03:30')
+            
+            full_event_time = f"{start_time} - {end_time} ({event_timezone})"
             new_location = request.form.get('event_location')
             
             current_event = events_collection.find_one({"_id": ObjectId(event_id)})
@@ -287,7 +299,7 @@ def manage_data():
             update_data = {
                 "event_name": new_name,
                 "event_date": new_date,
-                "event_time": new_time,
+                "event_time": full_event_time, # Menyimpan hasil gabungan baru
                 "event_location": new_location,
                 "event_logo": final_logo
             }
