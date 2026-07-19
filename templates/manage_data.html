@@ -26,7 +26,7 @@
         <input type="hidden" name="form_type" value="create_event" />
         
         <!-- INPUT HIDDEN: Mengirim timezone otomatis dan default time -->
-        <input type="hidden" name="event_timezone" id="eventTimezoneInput" value="UTC+00:00" />
+        <input type="hidden" name="event_timezone" id="eventTimezoneInput" value="+00:00" />
         <input type="hidden" name="event_time" value="10:00-15:00" />
 
         <div class="mb-3">
@@ -228,43 +228,76 @@
   {% set cal_link = "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" ~ (ev.event_name | urlencode) ~ "&dates=" ~ clean_date ~ "T100000/" ~ clean_date ~ "T150000&details=Undangan+Digital+Resmi&location=" ~ ((ev.event_location if ev.event_location else 'Jakarta') | urlencode) %}
   {% set embed_maps_url = "https://maps.google.com/maps?q=" ~ (ev.event_location | urlencode) ~ "&t=&z=15&ie=UTF8&iwloc=&output=embed" %}
 
-<div class="modal fade" id="detailEventModal{{ ev._id }}" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-md">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title fw-bold">Detail Event</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<div class="modal fade" id="detailEventModal{{ ev._id }}" tabindex="-1" aria-labelledby="detailEventModalLabel{{ ev._id }}" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-dark text-white py-3">
+        <h5 class="modal-title fw-bold" id="detailEventModalLabel{{ ev._id }}">
+          <i class="bi bi-info-circle me-2"></i>Detail Informasi Acara
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body">
-        <div class="text-center mb-3">
-          {% if ev.event_logo and (ev.event_logo.startswith('http://') or ev.event_logo.startswith('https://') or ev.event_logo.startswith('/')) %}
-            <img src="{{ ev.event_logo }}" alt="logo" class="img-thumbnail" style="width: 100px; height: 100px; object-fit: cover;">
+      <div class="modal-body p-4">
+        
+        <!-- Tabel Detail Informasi Utama -->
+        <div class="table-responsive bg-light p-2 rounded border mb-4">
+          <table class="table table-borderless align-middle mb-0 small">
+            <tr>
+              <td class="text-muted fw-semibold w-25">Nama Acara</td>
+              <td>: <strong>{{ ev.event_name }}</strong></td>
+            </tr>
+            <tr>
+              <td class="text-muted fw-semibold">Tanggal Acara</td>
+              <td>: {{ ev.event_date }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted fw-semibold">Waktu Acara</td>
+              <td>: {{ ev.event_time }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted fw-semibold">Lokasi Acara</td>
+              <td>: {{ ev.event_location }}</td>
+            </tr>
+            
+            <!-- MENAMPILKAN LINK LAGU (BARU) -->
+            <tr>
+              <td class="text-muted fw-semibold">Musik Latar (URL)</td>
+              <td>: 
+                {% if ev.bg_music_url %}
+                  <a href="{{ ev.bg_music_url }}" target="_blank" class="text-decoration-none text-info">
+                    <i class="bi bi-music-note-beamed me-1"></i>Dengarkan Audio/Musik
+                  </a>
+                {% else %}
+                  <span class="text-muted italic">- Tidak ada musik latar -</span>
+                {% endif %}
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- MENAMPILKAN FOTO-FOTO ACARA (BARU) -->
+        <div class="border rounded p-3 bg-white shadow-sm">
+          <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-images me-2"></i>Galeri Foto Acara</h6>
+          {% if ev.events_photos %}
+            <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 g-3">
+              {% for photo in ev.events_photos %}
+                <div class="col">
+                  <div class="border rounded overflow-hidden shadow-xs bg-light p-1 text-center h-100">
+                    <img src="{{ photo }}" alt="Foto Acara" class="img-fluid rounded" style="height: 110px; width: 100%; object-fit: cover;">
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
           {% else %}
-            <div class="fs-1">{{ ev.event_logo if ev.event_logo else '🎉' }}</div>
+            <div class="alert alert-light text-center py-3 mb-0 border small text-muted">
+              <i class="bi bi-image me-1"></i> Belum ada foto acara yang diunggah untuk acara ini.
+            </div>
           {% endif %}
         </div>
-        
-        <table class="table table-sm table-borderless text-start mb-0">
-          <tr><td class="fw-bold text-secondary w-25">Event Name:</td><td>{{ ev.event_name }}</td></tr>
-          <tr><td class="fw-bold text-secondary">Date:</td><td>{{ ev.event_date }}</td></tr>
-          <tr><td class="fw-bold text-secondary">Time:</td><td>{{ ev.event_time }}</td></tr>
-          <tr><td class="fw-bold text-secondary">Status:</td><td>{{ ev.status }}</td></tr>
-          <tr>
-            <td class="fw-bold text-secondary">Event Venue:</td>
-            <td>
-              {{ ev.event_location if ev.event_location else 'Great Wall of China' }}
-              <div class="mt-2 border rounded overflow-hidden shadow-sm" style="max-width: 100%; height: 150px;">
-                <iframe src="{{ embed_maps_url }}" style="width: 100%; height: 100%; border: 0;" allowfullscreen="" loading="lazy"></iframe>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td class="fw-bold text-secondary pt-3">Google Calendar:</td>
-            <td class="pt-3">
-              <a href="{{ cal_link }}" target="_blank" class="text-primary text-decoration-none fw-semibold">Add to Google Calendar</a>
-            </td>
-          </tr>
-        </table>
+
+      </div>
+      <div class="modal-footer bg-light py-2">
+        <button type="button" class="btn btn-secondary btn-sm px-4 fw-semibold" data-bs-dismiss="modal">Tutup</button>
       </div>
     </div>
   </div>
@@ -349,6 +382,27 @@
             </div>
 
             <input type="file" name="event_logo" id="fileInput{{ ev._id }}" class="form-control" accept="image/*" onchange="previewImage(this, '{{ ev._id }}')" />
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Background Music URL</label>
+            <input type="url" name="bg_music_url" class="form-control" value="{{ ev.bg_music_url if ev.bg_music_url else '' }}" placeholder="Masukkan tautan audio atau video YouTube" />
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Foto-Foto Acara (Multiple)</label>
+            <input type="file" name="events_photos" id="eventsInput{{ ev._id }}" class="form-control form-control-sm" accept="image/*" multiple onchange="previewEvents(this, '{{ ev._id }}')" />
+            
+            <!-- Container untuk Live Preview Foto yang Dipilih -->
+            <div id="eventsPreviewContainer{{ ev._id }}" class="d-flex flex-wrap gap-2 mt-2 p-2 border rounded bg-light min-inline-size-100" style="min-height: 80px;">
+              {% if ev.events_photos %}
+                {% for photo in ev.events_photos %}
+                  <img src="{{ photo }}" class="img-thumbnail" style="width: 70px; height: 70px; object-fit: cover;">
+                {% endfor %}
+              {% else %}
+                <small class="text-muted m-auto" id="placeholderText{{ ev._id }}">Belum ada foto pendamping terpilih.</small>
+              {% endif %}
+            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -481,6 +535,34 @@
     }
   }
 
+  function previewEvents(input, eventId) {
+    const container = document.getElementById('bridesmaidsPreviewContainer' + eventId);
+    const placeholder = document.getElementById('placeholderText' + eventId);
+    
+    // Bersihkan container preview terlebih dahulu
+    container.innerHTML = '';
+
+    if (input.files && input.files.length > 0) {
+        if (placeholder) placeholder.style.display = 'none';
+        
+        Array.from(input.files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.className = 'img-thumbnail';
+                img.style.width = '70px';
+                img.style.height = '70px';
+                img.style.objectFit = 'cover';
+                container.appendChild(img);
+            }
+            reader.readAsDataURL(file);
+        });
+    } else {
+        container.innerHTML = '<small class="text-muted m-auto">Belum ada foto pendamping terpilih.</small>';
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     // Inisialisasi DataTables untuk Events List
     $('#eventsTable').DataTable({
@@ -556,7 +638,7 @@
         const absMinutes = Math.abs(offsetMinutes);
         const hours = String(Math.floor(absMinutes / 60)).padStart(2, '0');
         const minutes = String(absMinutes % 60).padStart(2, '0');
-        const timezoneString = `(${sign}${hours}:${minutes})`;
+        const timezoneString = `${sign}${hours}:${minutes}`; // Hasil bersih: UTC+07:00
         tzInput.value = timezoneString;
     }
   });

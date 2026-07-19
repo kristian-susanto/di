@@ -168,6 +168,10 @@ def dashboard():
     user_id = session['user']['id']
     username = session['user']['username']
     
+    if current_role == 'usher':
+        flash("Welcome! You have been redirected to the Guestbook.", "info")
+        return redirect(url_for('guestbook')) # Pastikan 'guestbook' adalah nama fungsi route guestbook Anda
+        
     # Ambil parameter filter event dari query string URL
     selected_event_id = request.args.get('event_id')
     
@@ -272,16 +276,15 @@ def manage_data():
         if form_type == 'create_event':
             event_name = request.form.get('event_name')
             event_date = request.form.get('event_date')
-            
             start_time = request.form.get('event_start_time', '10:00')
             end_time = request.form.get('event_end_time', '15:00')
-            # Default fallback diubah menjadi format 6 karakter tanpa kata UTC
-            event_timezone = request.form.get('event_timezone', '(+00:00)')
+            event_timezone = request.form.get('event_timezone', '+00:00') 
             
-            # Menggabungkan menjadi format
-            full_event_time = f"{start_time}-{end_time} {event_timezone}"
+            # Menggabungkan menjadi format yang diinginkan
+            full_event_time = f"{start_time}-{end_time} ({event_timezone})"
             
             event_logo = '🎉'
+            bg_music_url = request.form.get('bg_music_url', '')
             status = 'Pending Approval' if current_role == 'admin' else 'Approved'
             
             events_collection.insert_one({
@@ -290,6 +293,7 @@ def manage_data():
                 "event_time": full_event_time, 
                 "event_location": "Great Wall of China",
                 "event_logo": event_logo,
+                "bg_music_url": bg_music_url,
                 "status": status,
                 "created_by": username
             })
@@ -379,13 +383,35 @@ def manage_data():
                     file.save(destination_path)
                     final_logo = f"/{UPLOAD_FOLDER}/{filename}"
             
+            # Tangkap inputan teks baru
+            bg_music_url = request.form.get('bg_music_url')
+
+            # Kelola upload multiple foto pendamping
+            uploaded_photos = []
+            if 'events_photos' in request.files:
+                files = request.files.getlist('events_photos')
+                for file in files:
+                    if file and file.filename != '':
+                        # Ambil ekstensi berkas asli
+                        ext = os.path.splitext(file.filename)[1]
+                        # Buat nama file unik yang aman
+                        filename = f"events_{secrets.token_hex(8)}{ext}"
+                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                        file.save(filepath)
+                        uploaded_photos.append('/' + filepath)
+            
             update_data = {
                 "event_name": new_name,
                 "event_date": new_date,
                 "event_time": full_event_time, # Menyimpan hasil gabungan baru
                 "event_location": new_location,
-                "event_logo": final_logo
+                "event_logo": final_logo,
+                "bg_music_url": bg_music_url
             }
+
+            # Jika user mengunggah foto baru, perbarui data list fotonya
+            if uploaded_photos:
+                update_data["events_photos"] = uploaded_photos
 
             events_collection.update_one({"_id": ObjectId(event_id)}, {"$set": update_data})
             invitations_collection.update_many(

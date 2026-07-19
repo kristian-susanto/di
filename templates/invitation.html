@@ -237,9 +237,34 @@
           {% endif %}
         </div>
       </div>
+
+      {% if event.events_photos %}
+      <div class="card card-custom p-4 mt-4 animate__animated animate__fadeInUp">
+          <h4 class="fw-bold text-center text-primary mb-4">
+              <i class="bi bi-people-fill"></i> Foto-Foto Acara
+          </h4>
+          <div class="row row-cols-2 row-cols-md-4 g-3 justify-content-center">
+              {% for photo in event.events_photos %}
+              <div class="col text-center">
+                  <div class="border rounded overflow-hidden shadow-sm bg-white p-2 h-100">
+                      <img src="{{ photo }}" alt="Pendamping Acara" class="img-fluid rounded" style="height: 160px; width: 100%; object-fit: cover;">
+                      <p class="small text-muted mt-2 mb-1 fw-semibold">Photo</p>
+                  </div>
+              </div>
+              {% endfor %}
+          </div>
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>
+
+{% if event.bg_music_url %}
+<audio id="weddingMusic" loop autoplay>
+  <source src="{{ event.bg_music_url }}" type="audio/mpeg">
+  Browser Anda tidak mendukung elemen audio.
+</audio>
+{% endif %}
 
 <!-- SCRIPT HANDLER JAVASCRIPT -->
 <script>
